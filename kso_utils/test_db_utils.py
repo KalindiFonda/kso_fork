@@ -33,3 +33,12 @@ def test_create_db():
     with pytest.raises(sqlite3.Error, match="Failed to execute the SQL statements"):
         conn = db_utils.create_connection(db_path_str)
         db_utils._execute_sql(conn, "random_string")
+
+
+def test_empty_table():
+    conn = db_utils.create_connection(db_path_str)
+    # If create_db is successfull, the db has a table called "movies"
+    db_utils.empty_table(conn, "movies")
+    # Also test if we get an error when we try to remove a table that does not exist
+    with pytest.raises(sqlite3.Error, match="does not exist"):
+        db_utils.empty_table(conn, "random")

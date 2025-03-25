@@ -37,26 +37,23 @@ def create_connection(db_path_str: str):
     return conn
 
 
-def drop_table(conn: sqlite3.Connection, table_name: str):
+def empty_table(conn: sqlite3.Connection, table_name: str):
     """
-    Safely remove a table from a Sql db
+    Safely empty a table from its data in a Sql db
 
     :param conn: the Connection object
     :param table_name: table of interest
     """
     # Creating a cursor object using the cursor() method
     cursor = conn.cursor()
-
     try:
         cursor.execute(f"DELETE FROM {table_name}")
-    except Exception as e:
-        logging.info(f"Table doesn't exist, {e}")
-        return
-    logging.debug(f"Previous content from the {table_name} table have been cleared.")
-
-    # Commit your changes in the database
-    conn.commit()
-
+        logging.info(f"Previous content from the '{table_name}' table have been cleared.")
+        conn.commit() # Commit your changes in the database
+    except sqlite3.Error:
+        cursor.execute("PRAGMA table_list;")
+        raise sqlite3.Error(f"Table '{table_name}' does not exist, only tables {[row[1] for row in cursor.fetchall()]}")
+        
 
 def _insert_many(conn: sqlite3.Connection, data: list, table: str, count: int):
     """

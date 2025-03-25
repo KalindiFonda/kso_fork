@@ -422,10 +422,10 @@ def process_zoo_classifications(
         subjects_df["subject_id"].isin(unique_subject_ids)
     ].copy()
 
-    from kso_utils.db_utils import drop_table
+    from kso_utils.db_utils import empty_table
 
     # Safely remove subjects table
-    drop_table(conn=db_connection, table_name="subjects")
+    empty_table(conn=db_connection, table_name="subjects")
 
     if len(subjects_series) > 0:
         # Fill or re-fill subjects table
