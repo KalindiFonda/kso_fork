@@ -84,7 +84,7 @@ def get_movie_path(f_path: str, project: Project, server_connection: dict = None
         return f_path
 
 
-def movies_in_movie_folder(project: Project, server_connection: dict):
+def _movies_in_movie_folder(project: Project, server_connection: dict):
     """
     This function uses the project information and the database information, and returns
     a dataframe of the movies in the "movie_folder".
@@ -152,7 +152,7 @@ def retrieve_movie_info_from_server(
     """
 
     # Create a dataframe of the movies in the "movie_folder"
-    mov_folder_df = movies_in_movie_folder(project, server_connection)
+    mov_folder_df = _movies_in_movie_folder(project, server_connection)
 
     from kso_utils.db_utils import get_df_from_db_table
 
@@ -222,42 +222,6 @@ def retrieve_movie_info_from_server(
         )
 
     return available_movies_df, no_available_movies_df, no_info_movies_df
-
-
-def preview_movie(
-    movie_path: str,
-    movie_metadata: pd.DataFrame,
-):
-    """
-    It takes a movie filename and its associated metadata and returns a widget object that can be displayed in the notebook
-
-    :param movie_path: the filename of the movie you want to preview
-    :param movie_metadata: the metadata of the movie you want to preview
-    :return: Widget object
-    """
-
-    # Adjust the width of the video and metadata sections based on your preference
-    video_width = "60%"  # Adjust as needed
-    metadata_width = "40%"  # Adjust as needed
-
-    if "http" in movie_path:
-        video_widget = widgets.Video.from_url(movie_path, width=video_width)
-    else:
-        video_widget = widgets.Video.from_file(movie_path, width=video_width)
-
-    metadata_html = movie_metadata.T.to_html()
-
-    metadata_widget = widgets.HTML(
-        value=metadata_html,
-        layout=widgets.Layout(width=metadata_width, overflow="auto"),
-    )
-
-    # Create a horizontal box layout to display video and metadata side by side
-    display_widget = widgets.HBox([video_widget, metadata_widget])
-
-    display(display_widget)
-
-    return display_widget
 
 
 def get_info_selected_movies(
@@ -363,14 +327,14 @@ def extract_frames(
             key_movie_df = df[df["fpath"] == movie].reset_index()
 
             # Read the movie on cv2 and prepare to extract frames
-            write_movie_frames(key_movie_df, url)
+            _write_movie_frames(key_movie_df, url)
 
         logging.info("Frames extracted successfully")
 
     return df
 
 
-def write_movie_frames(key_movie_df: pd.DataFrame, url: str):
+def _write_movie_frames(key_movie_df: pd.DataFrame, url: str):
     """
     Function to get a frame from a movie
     :param key_movie_df: a df with the information of the movie
@@ -406,7 +370,7 @@ def get_movie_extensions():
     return tuple(["wmv", "mpg", "mov", "avi", "mp4", "MOV", "MP4"])
 
 
-def convert_video(
+def _convert_video(
     movie_path: str,
     movie_filename: str,
     fps_output: str,
@@ -491,7 +455,7 @@ def convert_video(
     return str(conv_fpath)
 
 
-def standarise_movie_format(
+def _standarise_movie_format(
     project: Project,
     server_connection: dict,
     movie_path: str,
@@ -602,7 +566,7 @@ def standarise_movie_format(
         # Specify the desired fps of the movie
         fps_output = "fps=" + str(round(fps))
 
-        conv_mov_path = convert_video(
+        conv_mov_path = _convert_video(
             movie_path=movie_path,
             movie_filename=movie_filename,
             fps_output=fps_output,
@@ -696,7 +660,7 @@ def check_movies_meta(
 
             # Convert movies to the right format, frame rate or codec and upload them to the project's server/storage
             [
-                standarise_movie_format(
+                _standarise_movie_format(
                     project=project,
                     server_connection=server_connection,
                     movie_path=get_movie_path(j, project, server_connection),
