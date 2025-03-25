@@ -15,21 +15,21 @@ logging.getLogger().setLevel(logging.INFO)
 
 
 # SQL specific functions
-def create_connection(db_file: str):
+def create_connection(db_path_str: str):
     """create a database connection to the SQLite database
-        specified by db_file
+        specified by db_path_str
 
-    :param db_file: database file
+    :param db_path_str: str of the path to the database file
     :return: Connection object or None
     """
     conn = None
-    db_path = Path(db_file)
+    db_path = Path(db_path_str)
     try:
         if not db_path.parent.exists():
             if not db_path.parent == Path(""):
                 db_path.parent.mkdir(parents=True)
                 db_path.parent.chmod(0o777)
-        conn = sqlite3.connect(db_file)
+        conn = sqlite3.connect(db_path_str)
         conn.execute("PRAGMA foreign_keys = 1")
         db_path.chmod(0o777)
         return conn
@@ -274,23 +274,21 @@ def cols_rename_to_schema(
 
 
 # Utility functions for common database operations
-def create_db(db_path: str):
+def create_db(db_path_str: str):
     """Create a new database for the project
 
-    :param db_path: path of the database file
+    :param db_path: str of the path of the database file
     :return:
     """
-    db_file = Path(db_path)
-
+    db_path = Path(db_path_str)
     # Delete previous database versions if exists
-    if db_file.exists():
-        db_file.unlink()
+    if db_path.exists():
+        db_path.unlink()
 
     # Get sql command for db setup
     sql_setup = schema.sql
-
     # create a database connection
-    conn = create_connection(str(db_file))
+    conn = create_connection(db_path_str)
 
     # create tables
     if conn is not None:
