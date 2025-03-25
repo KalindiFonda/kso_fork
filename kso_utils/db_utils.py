@@ -60,7 +60,7 @@ def drop_table(conn: sqlite3.Connection, table_name: str):
     conn.commit()
 
 
-def insert_many(conn: sqlite3.Connection, data: list, table: str, count: int):
+def _insert_many(conn: sqlite3.Connection, data: list, table: str, count: int):
     """
     Insert multiple rows into table
 
@@ -78,26 +78,7 @@ def insert_many(conn: sqlite3.Connection, data: list, table: str, count: int):
     cur.executemany(f"INSERT INTO {table} VALUES {values}", data)
 
 
-def retrieve_query(conn: sqlite3.Connection, query: str):
-    """
-    Execute SQL query and returns output
-
-    :param conn: the Connection object
-    :param query: a SQL query
-    :return:
-    """
-    try:
-        cur = conn.cursor()
-        cur.execute(query)
-    except sqlite3.Error as e:
-        logging.error(e)
-
-    rows = cur.fetchall()
-
-    return rows
-
-
-def execute_sql(conn: sqlite3.Connection, sql: str):
+def _execute_sql(conn: sqlite3.Connection, sql: str):
     """Execute multiple SQL statements without return
 
     :param conn: Connection object
@@ -131,7 +112,7 @@ def add_to_table(
     """
 
     try:
-        insert_many(
+        _insert_many(
             conn,
             values,
             table_name,
@@ -314,7 +295,7 @@ def create_db(db_path: str):
     # create tables
     if conn is not None:
         # execute sql
-        execute_sql(conn, sql_setup)
+        _execute_sql(conn, sql_setup)
         return "Database creation success"
     else:
         return "Database creation failure"
