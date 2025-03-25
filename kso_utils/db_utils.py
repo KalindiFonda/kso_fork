@@ -32,10 +32,8 @@ def create_connection(db_path_str: str):
         conn = sqlite3.connect(db_path_str)
         conn.execute("PRAGMA foreign_keys = 1")
         db_path.chmod(0o777)
-        return conn
     except sqlite3.Error as e:
-        logging.error(e)
-
+        raise sqlite3.Error(f"Failed to connect to {db_path_str}: {e}")
     return conn
 
 
@@ -89,7 +87,7 @@ def _execute_sql(conn: sqlite3.Connection, sql: str):
         c = conn.cursor()
         c.executescript(sql)
     except sqlite3.Error as e:
-        logging.error(e)
+        raise sqlite3.Error(f"Failed to execute the SQL statements. Error: {e}. SQL statements: {sql}")
 
 
 def add_to_table(
@@ -290,13 +288,10 @@ def create_db(db_path_str: str):
     # create a database connection
     conn = create_connection(db_path_str)
 
-    # create tables
-    if conn is not None:
-        # execute sql
-        _execute_sql(conn, sql_setup)
-        return "Database creation success"
-    else:
-        return "Database creation failure"
+    # create tables by executing sql
+    _execute_sql(conn, sql_setup)
+    logging.info("Database creation success")
+    return
 
 
 def populate_db(
