@@ -1303,7 +1303,6 @@ def populate_subjects(
         conn=db_connection,
         table_name="subjects",
         values=[tuple(i) for i in subjects.values],
-        num_fields=11,
     )
 
     # log how many subjects are in the db

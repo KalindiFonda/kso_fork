@@ -55,22 +55,22 @@ def empty_table(conn: sqlite3.Connection, table_name: str):
         raise sqlite3.Error(f"Table '{table_name}' does not exist, only tables {[row[1] for row in cursor.fetchall()]}")
         
 
-def _insert_many(conn: sqlite3.Connection, data: list, table: str, count: int):
+def _insert_many(conn: sqlite3.Connection, data: list, table: str):
     """
     Insert multiple rows into table
 
     :param conn: the Connection object
-    :param data: data to be inserted into table
+    :param data: data to be inserted into table, this is a list of tuples,
+     where the lenght of the tuples should be equal to the amount of columns in the table.
     :param table: table of interest
-    :param count: number of fields
     :return:
     """
-
-    values = (1,) * count
-    values = str(values).replace("1", "?")
-
+    # The VALUES in the sql query should get a list of ? placeholders matching the number of columns.
     cur = conn.cursor()
-    cur.executemany(f"INSERT INTO {table} VALUES {values}", data)
+    cur.executemany(
+        f"INSERT INTO {table} VALUES ({', '.join(['?' for _ in data[0]])})", data
+    )
+    conn.commit() # This is needed to close the database, otherwise it is locked for running _insert_many again.
 
 
 def _execute_sql(conn: sqlite3.Connection, sql: str):
@@ -88,7 +88,7 @@ def _execute_sql(conn: sqlite3.Connection, sql: str):
 
 
 def add_to_table(
-    conn: sqlite3.Connection, table_name: str, values: list, num_fields: int
+    conn: sqlite3.Connection, table_name: str, values: list
 ):
     """
     This function adds multiple rows of data to a specified table in a SQLite database.
@@ -97,13 +97,8 @@ def add_to_table(
     :param table_name: The name of the table in the database where the values will be added
     :type table_name: str
     :param values: The `values` parameter is a list of tuples, where each tuple represents a row of data
-    to be inserted into the specified table. The number of values in each tuple should match the
-    `num_fields` parameter, which specifies the number of columns in the table
+    to be inserted into the specified table.
     :type values: list
-    :param num_fields: The parameter `num_fields` is an integer that represents the number of fields or
-    columns in the table where the values will be inserted. This parameter is used to ensure that the
-    correct number of values are being inserted into the table
-    :type num_fields: int
     """
 
     try:
@@ -111,7 +106,6 @@ def add_to_table(
             conn,
             values,
             table_name,
-            num_fields,
         )
 
     except sqlite3.Error as e:
@@ -319,7 +313,6 @@ def populate_db(
             conn=conn,
             table_name=init_key,
             values=[tuple(i) for i in local_df.values],
-            num_fields=len(local_df.columns),
         )
 
 
