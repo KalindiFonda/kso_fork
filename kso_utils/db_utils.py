@@ -53,24 +53,6 @@ def empty_table(conn: sqlite3.Connection, table_name: str):
     except sqlite3.Error:
         cursor.execute("PRAGMA table_list;")
         raise sqlite3.Error(f"Table '{table_name}' does not exist, only tables {[row[1] for row in cursor.fetchall()]}")
-        
-
-def _insert_many(conn: sqlite3.Connection, data: list, table: str):
-    """
-    Insert multiple rows into table
-
-    :param conn: the Connection object
-    :param data: data to be inserted into table, this is a list of tuples,
-     where the lenght of the tuples should be equal to the amount of columns in the table.
-    :param table: table of interest
-    :return:
-    """
-    # The VALUES in the sql query should get a list of ? placeholders matching the number of columns.
-    cur = conn.cursor()
-    cur.executemany(
-        f"INSERT INTO {table} VALUES ({', '.join(['?' for _ in data[0]])})", data
-    )
-    conn.commit() # This is needed to close the database, otherwise it is locked for running _insert_many again.
 
 
 def _execute_sql(conn: sqlite3.Connection, sql: str):
@@ -96,17 +78,18 @@ def add_to_table(
     :param conn: SQL connection object
     :param table_name: The name of the table in the database where the values will be added
     :type table_name: str
-    :param values: The `values` parameter is a list of tuples, where each tuple represents a row of data
-    to be inserted into the specified table.
+    :param values: The `values` parameter is a list of tuples, where each tuple represents
+    a row of data to be inserted into the specified table. The lenght of the tuples should
+    be equal to the amount of columns in the table.
     :type values: list
     """
 
     try:
-        _insert_many(
-            conn,
-            values,
-            table_name,
+        cur = conn.cursor()
+        cur.executemany(
+            f"INSERT INTO {table_name} VALUES ({', '.join(['?' for _ in values[0]])})", values
         )
+        conn.commit()
 
     except sqlite3.Error as e:
         # Check if the error code indicates a foreign key constraint violation
@@ -125,8 +108,6 @@ def add_to_table(
             logging.error(f"Full Error: {e}")
         else:
             logging.error(e)  # Log the full error for other errors
-
-    conn.commit()
 
     logging.info(f"Updated {table_name} table from the temporary database")
 
