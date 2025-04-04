@@ -1311,14 +1311,14 @@ class ProjectProcessor:
 class MLProjectProcessor(ProjectProcessor):
     def __init__(
         self,
-        project_process: ProjectProcessor,
+        project: project_utils.Project,
         config_path: str = None,
         weights_path: str = None,
         output_path: str = None,
         classes: list = [],
         test: bool = False,
     ):
-        self.__dict__ = project_process.__dict__.copy()
+        super().__init__(project)
         self.project_name = self.project.Project_name.lower().replace(" ", "_")
         self.data_path = config_path
         self.weights_path = weights_path
