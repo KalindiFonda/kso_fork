@@ -89,7 +89,7 @@ def _movies_in_movie_folder(project: Project, server_connection: dict):
     This function uses the project information and the database information, and returns
     a dataframe of the movies in the "movie_folder".
 
-    :param project: the project object
+    :param project: the project processor object
     :param server_connection: a dictionary with the connection to the server
     :return: A dataframe with the following columns (index, movie_id, fpath, exists, filename_ext)
 
