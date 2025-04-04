@@ -23,15 +23,12 @@ def create_connection(db_path_str: str):
     :return: Connection object or None
     """
     conn = None
-    db_path = Path(db_path_str)
     try:
-        if not db_path.parent.exists():
-            if not db_path.parent == Path(""):
-                db_path.parent.mkdir(parents=True)
-                db_path.parent.chmod(0o777)
-        conn = sqlite3.connect(db_path_str)
-        conn.execute("PRAGMA foreign_keys = 1")
-        db_path.chmod(0o777)
+        if Path(db_path_str).exists():
+            conn = sqlite3.connect(db_path_str)
+            conn.execute("PRAGMA foreign_keys = 1")
+        else:
+            raise RuntimeError(f"Failed to connect to {db_path_str}: db missing")
     except sqlite3.Error as e:
         raise sqlite3.Error(f"Failed to connect to {db_path_str}: {e}")
     return conn
@@ -53,20 +50,6 @@ def empty_table(conn: sqlite3.Connection, table_name: str):
     except sqlite3.Error:
         cursor.execute("PRAGMA table_list;")
         raise sqlite3.Error(f"Table '{table_name}' does not exist, only tables {[row[1] for row in cursor.fetchall()]}")
-
-
-def _execute_sql(conn: sqlite3.Connection, sql: str):
-    """Execute multiple SQL statements without return
-
-    :param conn: Connection object
-    :param sql: a string of SQL statements
-    :return:
-    """
-    try:
-        c = conn.cursor()
-        c.executescript(sql)
-    except sqlite3.Error as e:
-        raise sqlite3.Error(f"Failed to execute the SQL statements. Error: {e}. SQL statements: {sql}")
 
 
 def add_to_table(
@@ -241,7 +224,7 @@ def cols_rename_to_schema(
 
 
 # Utility functions for common database operations
-def create_db(db_path_str: str):
+def create_db(db_path_str: str) -> sqlite3.Connection:
     """Create a new database for the project
 
     :param db_path: str of the path of the database file
@@ -254,13 +237,24 @@ def create_db(db_path_str: str):
 
     # Get sql command for db setup
     sql_setup = schema.sql
-    # create a database connection
+    # create the DB file if it does not exist
+    if not db_path.exists():
+        if not db_path.parent == Path(""):
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            db_path.parent.chmod(0o777)
+        with open(db_path, "w") as f:
+            pass
+    db_path.chmod(0o777)
+    # And connect to it
     conn = create_connection(db_path_str)
 
-    # create tables by executing sql
-    _execute_sql(conn, sql_setup)
+    try:
+        c = conn.cursor()
+        c.executescript(sql_setup)
+    except sqlite3.Error as e:
+        raise sqlite3.Error(f"Failed to init DB schema: {e}. SQL statements: {sql}")
     logging.info("Database creation success")
-    return
+    return conn
 
 
 def populate_db(

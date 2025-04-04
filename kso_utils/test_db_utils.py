@@ -5,38 +5,37 @@ import pytest
 import kso_utils.db_utils as db_utils
 
 
-# db_path is from the template project, defined in "db_starter/projects_list.csv"
-db_path_str = "template_project.db"
-
-
-def test_create_connection():
-    conn = db_utils.create_connection(db_path_str)
+def test_create_db():
+    db_path_str = "sample.db"
+    conn = db_utils.create_db(db_path_str)
+    assert Path(db_path_str).exists(), f"the db was not created: {db_path_str}"
     assert isinstance(
         conn, sqlite3.Connection
-    ), f"create_connection should return a sqlite3.Connection object. Instead it returned a {type(conn)}"
-    assert Path(
-        db_path_str
-    ).exists(), f"The database file at {db_path_str} does not exist, so it is not created and connected to successfully."
-
-    # Test if the error message get's displayed for invalid paths
-    with pytest.raises(sqlite3.Error, match="Failed to connect to"):
-        db_utils.create_connection("?invalid.db")
+    ), f"Connection is not a sqlite3.Connection: {type(conn)}"
+    # To test that the schema was inserted we should fetch information. Example:
+    # https://www.tutorialspoint.com/check-if-a-table-exists-in-sqlite-using-python
 
 
-def test_create_db():
-    # This function closes previous connections, calls upon create_connection and _execute_sql.
-    # Here we just check if the funtion runs. If the _execute_sql would fail because the schema.py file
-    # has changed and it is not correct, the _execute_sql should fail and this function would fail.
-    db_utils.create_db(db_path_str)
+def test_create_connection_db_missing():
+    # Only test the error path! The rest is tested in the fixture and in create_db
+    with pytest.raises(RuntimeError, match="db missing"):
+        db_utils.create_connection("missing.db")
 
-    # Test if the private function _execute_sql would fail with wrong SQL statements
-    with pytest.raises(sqlite3.Error, match="Failed to execute the SQL statements"):
-        conn = db_utils.create_connection(db_path_str)
-        db_utils._execute_sql(conn, "random_string")
 
-def test_get_schema_table_names():
-    conn = db_utils.create_connection(db_path_str)
-    names = db_utils.get_schema_table_names(conn)
+@pytest.fixture
+def connection():
+    # db_path is from the template project, defined in "db_starter/projects_list.csv"
+    db_path_str = "template_project.db"
+    conn = db_utils.create_db(db_path_str)
+
+    yield conn
+
+    conn.close()
+    Path(db_path_str).unlink()
+
+
+def test_get_schema_table_names(connection):
+    names = db_utils.get_schema_table_names(connection)
     print(names)
     assert isinstance(names, list), f"get_schema_table_names should return a list, instead it returns a {type(names)}"
     # The tables in the db from the template connection are defined in 'kso_utils/db_starter/schema.py'
@@ -51,46 +50,48 @@ def _get_row_count(conn: sqlite3.Connection, table):
     return row_count
 
 
-def test_add_to_table():
-    conn = db_utils.create_connection(db_path_str)
+def test_add_to_table(connection):
     # If create_db is successfull, the db has a table called "sites"
     table = "sites"
-    start_row_count = _get_row_count(conn, table)
+    start_row_count = _get_row_count(connection, table)
     # Add one row of data to this table, check if it exist.
     db_utils.add_to_table(
-        conn, table, [(1, "a", 10, 10, 10, 10), (2, "b", 20, 20, 20, 20)],
+        connection,
+        table,
+        [(1, "a", 10, 10, 10, 10), (2, "b", 20, 20, 20, 20)],
     )
-    after_row_count = _get_row_count(conn, table)
+    after_row_count = _get_row_count(connection, table)
     assert after_row_count == (
         start_row_count + 2
     ), f"_insert_many did not succeed to insert 2 rows, the row count before and after the function are {start_row_count} and {after_row_count}"
     # Test if we get an error telling us that the amount of columns are wrong when data is specified wrongly
     with pytest.raises(sqlite3.Error, match="columns but"):
         db_utils.add_to_table(
-            conn, table, [(1, "a", 10, 10, 10), (2, "b", 20, 20, 20)],
+            connection,
+            table,
+            [(1, "a", 10, 10, 10), (2, "b", 20, 20, 20)],
         )
 
 
-def test_empty_table():
-    conn = db_utils.create_connection(db_path_str)
+def test_empty_table(connection):
     # If create_db is successfull, the db has a table called "sites"
     table = "sites"
     # Add one row of data to this table, check if it exist.
-    db_utils.add_to_table(conn, table, [(3, "c", 10, 10, 10, 10)])
-    row_count = _get_row_count(conn, table)
+    db_utils.add_to_table(connection, table, [(3, "c", 10, 10, 10, 10)])
+    row_count = _get_row_count(connection, table)
     assert (
         row_count != 0
     ), f"It failed to add a row of data to the table '{table}', making it impossible to test the function empty_table. Look more at the test of _insert_many"
 
     # Then check if the empty_table function removes all data
-    db_utils.empty_table(conn, table)
-    empty_row_count = _get_row_count(conn, table)
+    db_utils.empty_table(connection, table)
+    empty_row_count = _get_row_count(connection, table)
     assert empty_row_count == 0, f"empty_table did not remove all data, the row count is {empty_row_count}"
 
     # Check if the table is still exists
-    table_names = db_utils.get_schema_table_names(conn)
+    table_names = db_utils.get_schema_table_names(connection)
     assert table in table_names, f"the table '{table}' does not exist anymore. empty_table should only empty the table, not delete it"
 
     # Also test if we get an error when we try to remove a table that does not exist
     with pytest.raises(sqlite3.Error, match="does not exist"):
-        db_utils.empty_table(conn, "random")
+        db_utils.empty_table(connection, "random")

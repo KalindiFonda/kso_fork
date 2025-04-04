@@ -143,11 +143,8 @@ class ProjectProcessor:
         It also return the db connection
         :return: The database connection object.
         """
-        # Create a new database for the project
-        db_utils.create_db(self.project.db_path)
-
-        # Connect to the database and add the db connection to project
-        self.db_connection = db_utils.create_connection(self.project.db_path)
+        # Create a new database for the project and get a connection
+        self.db_connection = db_utils.create_db(self.project.db_path)
 
         # Retrieves the table names of the sql db
         table_names = db_utils.get_schema_table_names(self.db_connection)
