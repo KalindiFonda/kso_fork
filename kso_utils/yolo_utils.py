@@ -345,10 +345,7 @@ def frame_aggregation(
     :type n_tracked_frames: int (optional)
     """
     # Establish connection to database
-    from kso_utils.db_utils import create_connection
     from kso_utils.zooniverse_utils import clean_label
-
-    conn = create_connection(project.db_path)
 
     # Select the id/s of species of interest
     if class_list[0] == "":
@@ -474,7 +471,7 @@ def frame_aggregation(
 
     # Clean species names
     species_df = pd.read_sql_query(
-        "SELECT id, commonName, scientificName FROM species", conn
+        "SELECT id, commonName, scientificName FROM species", db_connection
     )
 
     # Add species_id to train_rows

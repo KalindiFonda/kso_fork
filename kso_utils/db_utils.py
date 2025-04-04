@@ -15,25 +15,6 @@ logging.getLogger().setLevel(logging.INFO)
 
 
 # SQL specific functions
-def create_connection(db_path_str: str):
-    """create a database connection to the SQLite database
-        specified by db_path_str
-
-    :param db_path_str: str of the path to the database file
-    :return: Connection object or None
-    """
-    conn = None
-    try:
-        if Path(db_path_str).exists():
-            conn = sqlite3.connect(db_path_str)
-            conn.execute("PRAGMA foreign_keys = 1")
-        else:
-            raise RuntimeError(f"Failed to connect to {db_path_str}: db missing")
-    except sqlite3.Error as e:
-        raise sqlite3.Error(f"Failed to connect to {db_path_str}: {e}")
-    return conn
-
-
 def empty_table(conn: sqlite3.Connection, table_name: str):
     """
     Safely empty a table from its data in a Sql db
@@ -246,7 +227,11 @@ def create_db(db_path_str: str) -> sqlite3.Connection:
             pass
     db_path.chmod(0o777)
     # And connect to it
-    conn = create_connection(db_path_str)
+    try:
+        conn = sqlite3.connect(db_path_str)
+        conn.execute("PRAGMA foreign_keys = 1")
+    except sqlite3.Error as e:
+        raise sqlite3.Error(f"Failed to connect to {db_path_str}: {e}")
 
     try:
         c = conn.cursor()

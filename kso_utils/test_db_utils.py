@@ -16,12 +16,6 @@ def test_create_db():
     # https://www.tutorialspoint.com/check-if-a-table-exists-in-sqlite-using-python
 
 
-def test_create_connection_db_missing():
-    # Only test the error path! The rest is tested in the fixture and in create_db
-    with pytest.raises(RuntimeError, match="db missing"):
-        db_utils.create_connection("missing.db")
-
-
 @pytest.fixture
 def connection():
     # db_path is from the template project, defined in "db_starter/projects_list.csv"

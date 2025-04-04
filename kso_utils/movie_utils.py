@@ -84,14 +84,13 @@ def get_movie_path(f_path: str, project: Project, server_connection: dict = None
         return f_path
 
 
-def movies_in_movie_folder(project: Project, db_connection, server_connection: dict):
+def movies_in_movie_folder(project: Project, server_connection: dict):
     """
     This function uses the project information and the database information, and returns
     a dataframe of the movies in the "movie_folder".
 
     :param project: the project object
     :param server_connection: a dictionary with the connection to the server
-    :param db_connection: SQL connection object
     :return: A dataframe with the following columns (index, movie_id, fpath, exists, filename_ext)
 
     """
@@ -153,7 +152,7 @@ def retrieve_movie_info_from_server(
     """
 
     # Create a dataframe of the movies in the "movie_folder"
-    mov_folder_df = movies_in_movie_folder(project, db_connection, server_connection)
+    mov_folder_df = movies_in_movie_folder(project, server_connection)
 
     from kso_utils.db_utils import get_df_from_db_table
 
