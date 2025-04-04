@@ -102,12 +102,9 @@ def add_to_table(
 
             # Save the problematic value
             foreign_key_value = values[value_i]
-
-            logging.error(f"Foreign Key Constraint Error (table: {table_name}):")
-            logging.error(f"Error values: {foreign_key_value}")
-            logging.error(f"Full Error: {e}")
+            raise sqlite3.DataError(f"Foreign Key Constraint Error (table: {table_name}), Error values: {foreign_key_value}, Full Error: {e} ")
         else:
-            logging.error(e)  # Log the full error for other errors
+            raise sqlite3.Error(f"add_to_table failed: {e}")
 
     logging.info(f"Updated {table_name} table from the temporary database")
 
