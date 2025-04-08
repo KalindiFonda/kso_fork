@@ -2,6 +2,7 @@
 import sqlite3
 import logging
 from pathlib import Path
+from importlib import import_module
 import pandas as pd
 
 # util imports
@@ -176,31 +177,30 @@ def cols_rename_to_schema(
     :param table_name: The name of the table in the database where the data is stored
     :param reverse_lookup: a boolean value to reverse the dict if formatting from schema to csv
     """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError(f"Expected a pandas Dataframe for df, got {type(df)} instead.")
 
-    # Get the spyfish-specific column names and their correspondent
-    # schema fields
-    if project.Project_name in ["Spyfish_Aotearoa", "Spyfish_BOPRC"]:
-        from kso_utils.spyfish_utils import get_spyfish_col_names
-
-        col_names_lookup = get_spyfish_col_names(table_name)
-
-    # Get the koster-specific column names and their correspondent
-    # schema fields
-    if project.Project_name == "Koster_Seafloor_Obs":
-        from kso_utils.koster_utils import get_koster_col_names
-
-        col_names_lookup = get_koster_col_names(table_name)
-
-    # Rename project-specific columns using the dictionary
-    if "col_names_lookup" in locals():
-        if reverse_lookup:
-            # Reverse the dictionaries if formatting from schema to csv
-            col_names_lookup = dict(
-                zip(col_names_lookup.values(), col_names_lookup.keys())
-            )
-
-        df = df.rename(columns=col_names_lookup)
-
+    # Check if there is a function to rename the columns
+    try:
+        mod = import_module(project.utils_path)
+        func_get_col_names = getattr(mod, "get_col_names")
+        col_names_lookup = func_get_col_names(table_name)
+        logging.info(f"{project.Project_name} has colums to rename, these are successfully retrieved.")
+    except (ModuleNotFoundError, AttributeError) as e:
+        logging.info(f"{project.Project_name} does not contain any columns that need renaming. So the original column names are kept.")
+        return df
+    
+    if not isinstance(col_names_lookup, dict):
+        raise TypeError(f"The get_col_names function needs to return a dict, got a {type(col_names_lookup)}")
+    
+    # Actually rename the columns
+    if reverse_lookup:
+        # Reverse the dictionaries if formatting from schema to csv
+        col_names_lookup = dict(
+            zip(col_names_lookup.values(), col_names_lookup.keys())
+        )
+    df = df.rename(columns=col_names_lookup)
+    logging.info("The columns are successfully renamed.")
     return df
 
 

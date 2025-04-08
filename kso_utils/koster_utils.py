@@ -38,7 +38,7 @@ def fix_text_encoding_folder(folder_name):
                 old_path.rename(new_path)
 
 
-def get_koster_col_names(table_name: str):
+def get_col_names(table_name: str):
     """Return a dictionary with the project-specific column names of a csv of interest
     This function helps matching the schema format without modifying the column names of the original csv.
 

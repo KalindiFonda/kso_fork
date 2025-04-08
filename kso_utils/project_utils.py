@@ -27,6 +27,7 @@ class Project:
     movie_folder: str = None
     photo_folder: str = None
     ml_folder: str = None
+    utils_path: str = None
 
 
 def find_project(project_name: str = ""):
@@ -90,6 +91,7 @@ def find_project(project_name: str = ""):
                     movie_folder=row.get("movie_folder"),
                     photo_folder=row.get("photo_folder"),
                     ml_folder=row.get("ml_folder"),
+                    utils_path=row.get("utils_path")
                 )
                 return project
 
