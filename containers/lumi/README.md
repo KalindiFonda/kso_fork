@@ -11,11 +11,11 @@ Docker/Podman is needed for building the image. Follow these steps on Ubuntu:
 
 1. Install docker or podman:
 
-    sudo apt install podman-docker
+       sudo apt install podman-docker
 
 2. Add the following environment variable to `~/.bashrc` or redefine it always before running build commands:
 
-    export BUILDAH_FORMAT=docker
+       export BUILDAH_FORMAT=docker
 
 
 ## Workflow for building, publishing, and pulling images
