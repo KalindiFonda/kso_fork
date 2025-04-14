@@ -11,8 +11,11 @@ import numpy as np
 import gdown
 import datetime
 import ffmpeg
+import tempfile
+import requests
 import shutil
 import sqlite3
+import subprocess
 from tqdm import tqdm
 from panoptes_client import Panoptes, panoptes, Subject, SubjectSet
 from panoptes_client import Project as zooProject
@@ -159,10 +162,12 @@ def retrieve_zoo_info(
             )
             if info_n == "classifications":
                 url = "https://drive.google.com/file/d/1DvJ2nOrG32MR2D7faAJZXMNbEm_ra3rb/view?usp=sharing"
-            if info_n == "subjects":
+            elif info_n == "subjects":
                 url = "https://drive.google.com/file/d/18AWRPx3erL25IHekncgKfI_kXHFYAl8e/view?usp=sharing"
-            if info_n == "workflows":
+            elif info_n == "workflows":
                 url = "https://drive.google.com/file/d/1bZ6CSxJLxeoX8xVgMU7ZqL76RZDv-09A/view?usp=sharing"
+            else:
+                url = "empty"
             export = gdown.download(url, info_n + ".csv", quiet=False, fuzzy=True)
             export_df = pd.read_csv(export)
 
@@ -681,6 +686,8 @@ def aggregate_classifications(
         subject_parameters = 2
     elif subject_type == "frame":
         subject_parameters = 5
+    else:
+        subject_parameters = 2
 
     if not len(agg_params) == subject_parameters:
         logging.error("Incorrect agg_params length for subject type")
@@ -1363,7 +1370,6 @@ def check_movies_uploaded_zoo(project: Project, db_connection, selected_movies: 
         logging.info(f"{clips_uploaded} clips have already been uploaded.")
 
 
-# Function to extract the videos
 def extract_clips(
     movie_path: str,
     clip_length: int,
@@ -1373,27 +1379,24 @@ def extract_clips(
     gpu_available: bool,
     remove_audio: bool = True,
 ):
-    """
-    This function takes in a movie path, a clip length, a starting second index, an output clip path, a
-    dictionary of modification details, and a boolean indicating whether a GPU is available. It then
-    extracts a clip from the movie, and applies the modifications specified in the dictionary.
 
-    The function is written in such a way that it can be used to extract clips from a movie, and apply
-    modifications to the clips.
+    # Check if NVENC is supported
+    def is_nvenc_supported():
+        try:
+            result = subprocess.run(
+                ["ffmpeg", "-encoders"], capture_output=True, text=True, check=True
+            )
+            return "h264_nvenc" in result.stdout
+        except Exception:
+            return False
 
-    :param movie_path: The path to the movie file
-    :param clip_length: The length of the clip in seconds
-    :param upl_second_i: The second in the video to start the clip
-    :param output_clip_path: The path to the output clip
-    :param modification_details: a dictionary of dictionaries, where each dictionary contains the
-           details of a modification to be made to the video. The keys of the dictionary are the names of the
-           modifications, and the values are dictionaries containing the details of the modification.
-    :param gpu_available: If you have a GPU, set this to True. If you don't, set it to False
-    :param remove_audio: Boolen parameter specifying if remove the audio or not
-    """
-    # Ensure the clip doesn't already exist
+    # Only use GPU if NVENC is available
+    if gpu_available and not is_nvenc_supported():
+        logging.warning("h264_nvenc not supported, falling back to CPU encoding")
+        gpu_available = False
+
+    # Rest of your function...
     output_clip_path_check = Path(output_clip_path)
-
     if output_clip_path_check.exists():
         logging.info(
             f"The clip {output_clip_path} already exists, please remove it and run the code again."
@@ -1408,64 +1411,105 @@ def extract_clips(
             "ffmpeg is not found in your system's PATH. Please install or add its path to the PATH environment variable."
         )
 
-    # Set up input and output default prompts
+    # Set up input and output options
     input_path = movie_path
     output_path = str(output_clip_path)
 
-    input_options = {}
+    input_options = {"ss": upl_second_i, "t": clip_length}
     output_options = {}
-
-    # Add GPU-related options if available
-    if gpu_available:
-        input_options["hwaccel"] = "cuda"
-        output_options["c"] = "copy"
 
     # Add audio-related options if needed
     if remove_audio:
         output_options["an"] = None
 
-    # Access modifications from clip_modification_widget
+    # If we have modifications, always use specific encoder settings
+    using_specific_encoding = False
+
+    # Process modifications
     if modification_details:
-        # Set up modification
         for (
             modif_number,
             modification_details_dict,
         ) in modification_details.checks.items():
             if "filter" in modification_details_dict:
                 output_options["vf"] = modification_details_dict["filter"]
+                using_specific_encoding = True
+
             elif "b:v" in modification_details_dict:
-                # Specify the select size (MB) of the clip
                 output_options["b:v"] = modification_details_dict["b:v"]
+                using_specific_encoding = True
 
-            # add the cuda-compatible vcodec
-            if gpu_available:
-                # Remove the copy format argument
-                output_options.pop("c")
-                output_options["c:v"] = "h264_nvenc"
-                logging.info("Compressing using h264_nvenc")
+    # Configure encoder based on modifications and GPU availability
+    if using_specific_encoding:
+        if gpu_available:  # Don't use GPU acceleration with URLs
+            # Use GPU encoding with simple options
+            output_options["c:v"] = "h264_nvenc"
+            # Add hwaccel for input only if it's a local file
+            input_options["hwaccel"] = "cuda"
+        else:
+            # CPU encoding
+            output_options["c:v"] = "libx264"
+    else:
+        # For simple copy without modifications
+        output_options["c"] = "copy"
+        # Only add hwaccel for local files
+        if gpu_available:
+            input_options["hwaccel"] = "cuda"
 
-    input_options["ss"] = upl_second_i
-    input_options["t"] = clip_length
-
-    # Run the ffmpeg clip extraction code
+    # Try to run ffmpeg
     try:
-        ffmpeg.input(input_path, **input_options).output(
+        # Log the command for debugging
+        command = ffmpeg.input(input_path, **input_options).output(
             output_path, **output_options
-        ).run(overwrite_output=True)
+        )
+        logging.info(f"FFmpeg command: {' '.join(command.get_args())}")
+
+        # Run the command
+        command.run(overwrite_output=True, capture_stdout=True, capture_stderr=True)
 
     except ffmpeg.Error as e:
         logging.error("ffmpeg error occurred.")
-        logging.error(f"stderr: {e}")
         if e.stdout is not None:
             logging.error(f"stdout: {e.stdout.decode('utf8')}")
         if e.stderr is not None:
             logging.error(f"stderr: {e.stderr.decode('utf8')}")
-        raise e
+
+        # If using GPU and it failed, try with CPU
+        if (
+            gpu_available
+            and "c:v" in output_options
+            and output_options["c:v"] == "h264_nvenc"
+        ):
+            logging.warning("GPU encoding failed, trying CPU encoding instead")
+
+            # Create new options for CPU encoding
+            cpu_output_options = output_options.copy()
+            cpu_output_options["c:v"] = "libx264"
+
+            # Remove GPU-specific input options
+            cpu_input_options = input_options.copy()
+            if "hwaccel" in cpu_input_options:
+                cpu_input_options.pop("hwaccel")
+
+            try:
+                logging.info("Attempting CPU fallback encoding")
+                ffmpeg.input(input_path, **cpu_input_options).output(
+                    output_path, **cpu_output_options
+                ).run(overwrite_output=True, capture_stdout=True, capture_stderr=True)
+                logging.info("CPU fallback encoding successful")
+
+            except ffmpeg.Error as cpu_error:
+                logging.error("CPU fallback encoding also failed")
+                if cpu_error.stderr is not None:
+                    logging.error(f"CPU error: {cpu_error.stderr.decode('utf8')}")
+                raise cpu_error
+        else:
+            # If not using GPU or other error occurred
+            raise e
 
     # Ensure the clip was extracted
     if not os.path.exists(output_clip_path):
         raise FileNotFoundError("The clip wasn't extracted")
-
     else:
         os.chmod(output_clip_path, 0o777)
         logging.info("Clip extracted successfully")
@@ -1474,7 +1518,7 @@ def extract_clips(
 def create_clips(
     available_movies_df: pd.DataFrame,
     selected_movies: str,
-    movies_paths: str,
+    movie_path: str,
     clip_selection,
     project: Project,
     modification_details: dict,
@@ -1487,7 +1531,7 @@ def create_clips(
 
     :param available_movies_df: the dataframe with the movies that are available for the project
     :param selected_movies: the name(s) of the movie(s) you want to extract clips from
-    :param movies_paths: the path(s) to the movie(s) you want to extract clips from
+    :param movie_path: the path(s) to the movie(s) you want to extract clips from
     :param clip_selection: a ClipSelection object
     :param project: the project object
     :param modification_details: a dictionary with the following keys:
@@ -1588,6 +1632,45 @@ def create_clips(
     # Add information on the modification of the clips
     clips_start_df["clip_modification_details"] = str(modification_details)
 
+    # Check if input is a URL or local file
+    is_url = movie_path.startswith(("http://", "https://", "s3://"))
+
+    # If it's a URL and we want to use GPU, we need to handle specially
+    if is_url and gpu_available:
+        logging.info(
+            "Input is a URL. For GPU encoding with modifications, we'll first download the file locally"
+        )
+
+        # Create temp directory if it doesn't exist
+    temp_dir = tempfile.gettempdir()
+    local_filename = os.path.join(temp_dir, os.path.basename(movie_path.split("?")[0]))
+
+    # Check if file already exists
+    if os.path.exists(local_filename):
+        logging.info(f"File already exists locally at {local_filename}")
+        movie_path = local_filename
+        is_url = False
+    else:
+        # Download the file if it doesn't exist
+        try:
+            logging.info(f"Downloading {movie_path} to {local_filename}")
+            response = requests.get(movie_path, stream=True)
+            response.raise_for_status()
+
+            with open(local_filename, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+            movie_path = local_filename
+            is_url = False
+            logging.info(f"Download complete. Using local file: {local_filename}")
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Failed to download file: {str(e)}")
+            gpu_available = False
+            logging.warning(
+                "GPU encoding disabled due to download failure. Using CPU encoding instead."
+            )
+
     if is_example and modification_details.children[0].value > 0:
         # Set the filename of the original clips to be compared against the modified
         clips_start_df["clip_example_original_filename"] = clips_start_df.apply(
@@ -1607,7 +1690,7 @@ def create_clips(
         ):
             # Extract the videos and store them in the folder
             extract_clips(
-                movie_path=movies_paths,
+                movie_path=movie_path,
                 clip_length=clip_length,
                 upl_second_i=row["upl_seconds"],
                 output_clip_path=row["clip_example_original_path"],
@@ -1620,7 +1703,7 @@ def create_clips(
     # Read each movie and extract the clips from the original videos
     for index, row in tqdm(clips_start_df.iterrows(), total=clips_start_df.shape[0]):
         extract_clips(
-            movie_path=movies_paths,
+            movie_path=movie_path,
             clip_length=clip_length,
             upl_second_i=row["upl_seconds"],
             output_clip_path=row["clip_path"],
@@ -2265,6 +2348,7 @@ def set_zoo_frame_metadata(
         upload_to_zoo = spyfish_subject_metadata(df, csv_paths=csv_paths)
     else:
         logging.error("This project is not a supported Zooniverse project.")
+        upload_to_zoo = ""
 
     # Add information about the type of subject
     upload_to_zoo = upload_to_zoo.copy()

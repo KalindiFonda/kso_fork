@@ -38,6 +38,7 @@ def get_spyfish_col_names(table_name: str):
             "RecordedBy": "author",
             "SiteID": "siteName",
             "LinkToVideoFile": "fpath",
+            "fileName": "filename",
         }
 
     else:

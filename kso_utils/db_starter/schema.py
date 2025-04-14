@@ -57,7 +57,6 @@ id integer PRIMARY KEY,
 commonName text NOT NULL,
 scientificName text NOT NULL,
 taxonRank text NOT NULL,
-kingdom text NOT NULL,
 UNIQUE (commonName)
 );
 

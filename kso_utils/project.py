@@ -356,13 +356,13 @@ class ProjectProcessor:
         """
         if test:
             self.selected_movies = ["movie_1.mp4"]
-            self.selected_movies_paths = [
+            self.selected_movie_path = [
                 "https://www.wildlife.ai/wp-content/uploads/2022/06/movie_1.mp4"
             ]
 
         else:
             (
-                self.selected_movies_paths,
+                self.selected_movie_path,
                 self.selected_movies,
                 self.selected_movies_df,
                 self.selected_movies_ids,
@@ -663,7 +663,7 @@ class ProjectProcessor:
                 self.generated_clips = zoo_utils.create_clips(
                     available_movies_df=self.available_movies_df,
                     selected_movies=str(self.selected_movies[0]),
-                    movies_paths=str(self.selected_movies_paths[0]),
+                    movie_path=str(self.selected_movie_path[0]),
                     clip_selection=clip_selection,
                     project=self.project,
                     modification_details=clip_modification,
@@ -689,7 +689,7 @@ class ProjectProcessor:
             self.generated_clips = zoo_utils.create_clips(
                 available_movies_df=self.available_movies_df,
                 selected_movies=str(self.selected_movies[0]),
-                movies_paths=str(self.selected_movies_paths[0]),
+                movie_path=str(self.selected_movie_path[0]),
                 clip_selection=clip_selection,
                 project=self.project,
                 modification_details=clip_modification,
@@ -1185,7 +1185,7 @@ class ProjectProcessor:
         and saves the results in different csv files.
         """
         out_list = []
-        for movie_path in self.selected_movies_paths:
+        for movie_path in self.selected_movie_path:
             out_list.append(
                 yolo_utils.process_detections(
                     project=project,

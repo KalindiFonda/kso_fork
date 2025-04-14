@@ -305,7 +305,7 @@ def choose_footage(
 
             # Get the df and paths of the selected movies
             (
-                selected_movies_paths,
+                selected_movie_path,
                 selected_movies,
                 selected_movies_df,
                 selected_movies_ids,
@@ -328,7 +328,7 @@ def choose_footage(
                     index,
                     movie_row,
                 ) in selected_movies_df.iterrows():
-                    movie_path = selected_movies_paths[index]
+                    movie_path = selected_movie_path[index]
                     movie_metadata = pd.DataFrame(
                         [movie_row.values], columns=movie_row.index
                     )
@@ -391,6 +391,8 @@ def request_latest_zoo_info():
     :return: an interactive widget object with the value of the boolean
 
     """
+
+    generate = False
 
     def generate_export(retrieve_option):
         if retrieve_option == "No, just download the last available information":
@@ -1330,7 +1332,6 @@ class clip_modification_widget(widgets.VBox):
 def select_modification():
 
     # Widget to select the frame modification
-
     frame_modifications = {
         "Zoo_low_compression": {
             "b:v": "10M",
@@ -1342,15 +1343,15 @@ def select_modification():
             "b:v": "3M",
         },
         "Blur_sensitive_info": {
-            "filter": '.drawbox(0, 0, "iw", "ih*(15/100)", color="black", thickness="fill").drawbox(0, "ih*(95/100)", "iw", "ih*(15/100)", color="black", thickness="fill")',
+            "filter": "drawbox=0:0:iw:ih*(15/100):color=black:thickness=fill,drawbox=0:ih*(95/100):iw:ih*(15/100):color=black:thickness=fill",
         },
-        # Increase brightness (useful for low-light)
+        # Increase brightness
         "Increase_brightness": {
-            "filter": '.filter("eq", brightness=0.1)',  # Slight increase in brightness
+            "filter": "eq=brightness=0.1",
         },
-        # Increase contrast (useful for low-light)
+        # Increase contrast
         "Increase_contrast": {
-            "filter": '.filter("eq", contrast=1.5)',  # Higher contrast for better distinction
+            "filter": "eq=contrast=1.5",
         },
         # Increase both brightness and contrast together
         "Increase_brightness_and_contrast": {

@@ -110,7 +110,7 @@ def test_t3(zoo_user, zoo_pass):
     pp.connect_zoo_project(zoo_cred=[zoo_user, zoo_pass])
     # Pre-selected test movie
     pp.selected_movies = ["movie_1.mp4"]
-    pp.selected_movies_paths = [
+    pp.selected_movie_path = [
         "https://www.wildlife.ai/wp-content/uploads/2022/06/movie_1.mp4"
     ]
     # Check whether movie has been uploaded previously

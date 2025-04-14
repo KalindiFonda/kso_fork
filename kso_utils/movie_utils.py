@@ -31,10 +31,13 @@ logging.getLogger().setLevel(logging.INFO)
 def check_ffmpeg_availability():
     try:
         # Try to import the ffmpeg module from ffmpeg-python
-        import ffmpeg
+        result = subprocess.run(["ffmpeg", "-version"], capture_output=True, text=True)
+        print("FFmpeg Version:")
+        print(result.stdout.split("\n")[0])
 
         return True
-    except ImportError:
+    except FileNotFoundError:
+        print("FFmpeg is not installed or not in PATH")
         return False
 
 
@@ -284,7 +287,7 @@ def get_info_selected_movies(
         )
 
         # Retrieve the paths of the movies selected
-        selected_movies_paths = [
+        selected_movie_path = [
             get_movie_path(
                 project=project,
                 f_path=f_path,
@@ -307,12 +310,12 @@ def get_info_selected_movies(
         }
 
     elif footage_source == "New Footage":
-        selected_movies_paths = selected_movies
+        selected_movie_path = selected_movies
         selected_movies_ids = {}
         selected_movies_df = pd.DataFrame()
 
     return (
-        selected_movies_paths,
+        selected_movie_path,
         selected_movies,
         selected_movies_df,
         selected_movies_ids,
