@@ -185,9 +185,15 @@ def cols_rename_to_schema(
         mod = import_module(project.utils_path)
         func_get_col_names = getattr(mod, "get_col_names")
         col_names_lookup = func_get_col_names(table_name)
-        logging.info(f"{project.Project_name} has colums to rename, these are successfully retrieved.")
-    except (ModuleNotFoundError, AttributeError) as e:
-        logging.info(f"{project.Project_name} does not contain any columns that need renaming. So the original column names are kept.")
+        logging.info(f"{project.Project_name} has colums to rename, these are successfully retrieved.") 
+    except ModuleNotFoundError as e:
+        if e.name == project.utils_path:
+            logging.info(f"{project.Project_name} does not define a utils module for renaming. Skipping renaming.")
+            return df
+        else:
+            raise  # re-raise unexpected import errors
+    except AttributeError as e:
+        logging.info(f"{project.Project_name} does not define a 'get_col_names' function. Skipping renaming.")
         return df
     
     if not isinstance(col_names_lookup, dict):

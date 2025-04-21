@@ -1,8 +1,10 @@
 from pathlib import Path
 import sqlite3
 import pytest
+import pandas as pd
 
 import kso_utils.db_utils as db_utils
+import kso_utils.project_utils as project_utils
 
 
 def test_create_db():
@@ -31,11 +33,25 @@ def connection():
 def test_get_schema_table_names(connection):
     names = db_utils.get_schema_table_names(connection)
     print(names)
-    assert isinstance(names, list), f"get_schema_table_names should return a list, instead it returns a {type(names)}"
+    assert isinstance(
+        names, list
+    ), f"get_schema_table_names should return a list, instead it returns a {type(names)}"
     # The tables in the db from the template connection are defined in 'kso_utils/db_starter/schema.py'
     # And an extra table 'sqlite_sequence', which is created due to that we use AUTOINCREMENT for the agg_... tables
-    names_in_schema = ['sites', 'movies', 'photos', 'subjects', 'species', 'agg_annotations_clip', 'sqlite_sequence', 'agg_annotations_frame']
-    assert names == names_in_schema, f"The list of table names is not as we would expect it from schema.py. We expect: {names_in_schema}, instead we get {names}"
+    names_in_schema = [
+        "sites",
+        "movies",
+        "photos",
+        "subjects",
+        "species",
+        "agg_annotations_clip",
+        "sqlite_sequence",
+        "agg_annotations_frame",
+    ]
+    assert (
+        names == names_in_schema
+    ), f"The list of table names is not as we would expect it from schema.py. We expect: {names_in_schema}, instead we get {names}"
+
 
 def _get_row_count(conn: sqlite3.Connection, table):
     cur = conn.cursor()
@@ -80,12 +96,95 @@ def test_empty_table(connection):
     # Then check if the empty_table function removes all data
     db_utils.empty_table(connection, table)
     empty_row_count = _get_row_count(connection, table)
-    assert empty_row_count == 0, f"empty_table did not remove all data, the row count is {empty_row_count}"
+    assert (
+        empty_row_count == 0
+    ), f"empty_table did not remove all data, the row count is {empty_row_count}"
 
     # Check if the table is still exists
     table_names = db_utils.get_schema_table_names(connection)
-    assert table in table_names, f"the table '{table}' does not exist anymore. empty_table should only empty the table, not delete it"
+    assert (
+        table in table_names
+    ), f"the table '{table}' does not exist anymore. empty_table should only empty the table, not delete it"
 
     # Also test if we get an error when we try to remove a table that does not exist
     with pytest.raises(sqlite3.Error, match="does not exist"):
         db_utils.empty_table(connection, "random")
+
+
+def test_rename_to_schema():
+    template_project = project_utils.find_project("Template project")
+    # Test if the function fails when no df is entered
+    with pytest.raises(TypeError, match="Expected a pandas Dataframe"):
+        db_utils.cols_rename_to_schema(template_project, "species", "fail")
+
+    # Function works for project without renaming, example = template project
+    df_template_no_col_rename = pd.DataFrame(
+        [[1, "Nothing here", "Not applicable", "Not applicable", "Not applicable"]],
+        columns=["species_id", "commonName", "scientificName", "taxonRank", "kingdom"],
+    )
+    df_template_renamed = db_utils.cols_rename_to_schema(
+        template_project, "species", df_template_no_col_rename
+    )
+    assert list(df_template_no_col_rename.columns) == list(
+        df_template_renamed.columns
+    ), f"The template project does not need renaming, so it should return the same df. This is not the case. Original had column names {df_template_no_col_rename.columns}, returned df had {df_template_renamed.columns}"
+
+    # Test if the renaming works for koster, taken as the exampel to test
+    koster_project = project_utils.find_project("Koster_Seafloor_Obs")
+    df_koster = pd.DataFrame(
+        [
+            [
+                1,
+                "movie_1.mp4",
+                "Site_1",
+                "13/08/2021",
+                "Author_name_1",
+                25.0,
+                10.12,
+                0.0,
+                10.12,
+                "https://www.wildlife.ai/wp-content/uploads/2022/06/movie_1.mp4",
+            ],
+            [
+                2,
+                "movie_2.mp4",
+                "Site_1",
+                "13/08/2021",
+                "Author_name_2",
+                29.97002997002997,
+                10.043366666666667,
+                0.0,
+                10.043366666666667,
+                "https://www.wildlife.ai/wp-content/uploads/2022/06/movie_2.mp4",
+            ],
+        ],
+        columns=[
+            "movie_id",
+            "filename",
+            "siteName",
+            "created_on",
+            "author",
+            "fps",
+            "duration",
+            "SamplingStart",
+            "SamplingEnd",
+            "fpath",
+        ],
+    )
+    # First if it works for a table that does not need any renaming within koster
+    df_koster_renamed = db_utils.cols_rename_to_schema(
+        koster_project, "species", df_koster
+    )
+    assert list(df_koster.columns) == list(
+        df_koster_renamed.columns
+    ), f"The species table in the koster project does not need renaming, so it should return the same df. This is not the case. Original had column names {df_koster.columns}, returned df had {df_koster_renamed.columns}"
+    # Now with the movies table that does get renaming
+    df_koster_renamed = db_utils.cols_rename_to_schema(
+        koster_project, "movies", df_koster
+    )
+    assert list(df_koster.columns) != list(
+        df_koster_renamed.columns
+    ), f"The movies table in koster needs renaming, so it should not be the same as the original. But it is."
+    assert (
+        "sampling_start" in df_koster_renamed.columns
+    ), f"If the renaming was successfull, 'sampling_start' should have replaced 'SamplingStart'. But it did not, the column names of the renamed df are {df_koster_renamed.columns}"
