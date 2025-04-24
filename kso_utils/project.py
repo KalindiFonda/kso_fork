@@ -1,23 +1,19 @@
 # base imports
 import os
 import time
-import pims
 import sys
 import logging
-import wandb
 import datetime
 import numpy as np
 import pandas as pd
 import ipywidgets as widgets
 import ffmpeg
 import shutil
-from itertools import chain
 from pathlib import Path
 import imagesize
 import ipysheet
 from IPython.display import display, clear_output
-import mlflow
-from typing import List, Dict, Any
+from typing import List
 
 # util imports
 import kso_utils.project_utils as project_utils
@@ -1354,7 +1350,15 @@ class MLProjectProcessor(ProjectProcessor):
         self.modules = g_utils.import_modules(["zenodo_utils"], utils=True)
         self.modules.update(
             g_utils.import_modules(
-                ["torch", "wandb", "yaml", "ultralytics"],
+                [
+                    "torch",
+                    "wandb",
+                    "yaml",
+                    "ultralytics",
+                    "pims",
+                    "itertools",
+                    "mlflow",
+                ],
                 utils=False,
             )
         )
@@ -1446,10 +1450,10 @@ class MLProjectProcessor(ProjectProcessor):
         :return: The path to the baseline model.
         """
         if self.registry == "wandb":
-            api = wandb.Api()
+            api = self.modules["wandb"].Api()
             # weird error fix (initialize api another time)
             api.runs(path="koster/model-registry")
-            api = wandb.Api()
+            api = self.modules["wandb"].Api()
             collections = [
                 coll
                 for coll in api.artifact_type(
@@ -1504,12 +1508,14 @@ class MLProjectProcessor(ProjectProcessor):
             # Fetch model artifact list
             from mlflow import MlflowClient
 
-            experiment = mlflow.get_experiment_by_name(self.project_name)
+            experiment = self.modules["mlflow"].get_experiment_by_name(
+                self.project_name
+            )
             client = MlflowClient()
 
             if experiment is not None:
                 experiment_id = experiment.experiment_id if experiment else None
-                runs = mlflow.search_runs(
+                runs = self.modules["mlflow"].search_runs(
                     experiment_ids=experiment_id, output_format="list"
                 )
                 run_ids = [run.info.run_id for run in runs][-1:]
@@ -1565,7 +1571,7 @@ class MLProjectProcessor(ProjectProcessor):
                     clear_output()
                     try:
                         for af in model_names:
-                            artifact_dir = mlflow.download_artifacts(
+                            artifact_dir = self.modules["mlflow"].download_artifacts(
                                 artifact_uri=af, dst_path=download_path
                             )
                             artifact_file = [
@@ -1641,7 +1647,7 @@ class MLProjectProcessor(ProjectProcessor):
             self.modules["ultralytics"].settings.update({"mlflow": True})
 
         if self.registry == "mlflow":
-            active_run = mlflow.active_run()
+            active_run = self.modules["mlflow"].active_run()
 
             from mlflow.data.pandas_dataset import PandasDataset
 
@@ -1650,23 +1656,23 @@ class MLProjectProcessor(ProjectProcessor):
             valid_path = str(Path(parent_dir, "valid.txt"))
             train_df = pd.read_csv(train_path, delimiter="\t")
             val_df = pd.read_csv(valid_path, delimiter="\t")
-            train_dataset: PandasDataset = mlflow.data.from_pandas(
+            train_dataset: PandasDataset = self.modules["mlflow"].data.from_pandas(
                 train_df, source=train_path
             )
-            val_dataset: PandasDataset = mlflow.data.from_pandas(
+            val_dataset: PandasDataset = self.modules["mlflow"].data.from_pandas(
                 val_df, source=valid_path
             )
 
             from mlflow.exceptions import MlflowException
 
             try:
-                experiment_id = mlflow.create_experiment(
+                experiment_id = self.modules["mlflow"].create_experiment(
                     self.project_name,
                 )
             except MlflowException as e:
                 # Check if the experiment already exists
                 if "RESOURCE_ALREADY_EXISTS" in str(e):
-                    current_experiment = mlflow.get_experiment_by_name(
+                    current_experiment = self.modules["mlflow"].get_experiment_by_name(
                         self.project_name
                     )
                     experiment_id = current_experiment.experiment_id
@@ -1674,11 +1680,13 @@ class MLProjectProcessor(ProjectProcessor):
                     # Handle other MlflowExceptions
                     raise e
 
-            mlflow.start_run(experiment_id=experiment_id, run_name=exp_name)
+            self.modules["mlflow"].start_run(
+                experiment_id=experiment_id, run_name=exp_name
+            )
             # Wait 1 minute for MLFlow to register the new run
             time.sleep(60)
-            mlflow.log_input(train_dataset, context="training")
-            mlflow.log_input(val_dataset, context="validation")
+            self.modules["mlflow"].log_input(train_dataset, context="training")
+            self.modules["mlflow"].log_input(val_dataset, context="validation")
 
             if not Path(Path(self.data_path).parent, "images.zip").exists():
                 shutil.make_archive(
@@ -1695,11 +1703,11 @@ class MLProjectProcessor(ProjectProcessor):
                 )
 
             # Upload zip files
-            mlflow.log_artifact(
+            self.modules["mlflow"].log_artifact(
                 Path(Path(self.data_path).parent, "images.zip"),
                 artifact_path="input_datasets",
             )
-            mlflow.log_artifact(
+            self.modules["mlflow"].log_artifact(
                 Path(Path(self.data_path).parent, "labels.zip"),
                 artifact_path="input_datasets",
             )
@@ -1710,7 +1718,9 @@ class MLProjectProcessor(ProjectProcessor):
                 "*.yaml"
             ):  # rglob searches recursively for all .yaml files
                 # Log each .yaml file as an artifact
-                mlflow.log_artifact(yaml_file, artifact_path="input_datasets")
+                self.modules["mlflow"].log_artifact(
+                    yaml_file, artifact_path="input_datasets"
+                )
 
             # Upload txt files
             # Iterate over all files in the specified directory
@@ -1718,7 +1728,9 @@ class MLProjectProcessor(ProjectProcessor):
                 "*.txt"
             ):  # rglob searches recursively for all .yaml files
                 # Log each .yaml file as an artifact
-                mlflow.log_artifact(txt_file, artifact_path="input_datasets")
+                self.modules["mlflow"].log_artifact(
+                    txt_file, artifact_path="input_datasets"
+                )
         try:
             if "yolov5" in weights:
                 weights = str(Path(weights).name)
@@ -1738,7 +1750,7 @@ class MLProjectProcessor(ProjectProcessor):
         if self.registry == "wandb":
             self.modules["wandb"].finish()
         elif self.registry == "mlflow":
-            mlflow.end_run()
+            self.modules["mlflow"].end_run()
 
     def train_yolov5(
         self, exp_name, weights, project, epochs=50, batch_size=16, img_size=[640, 640]
@@ -1794,7 +1806,7 @@ class MLProjectProcessor(ProjectProcessor):
             imgsz=img_size,
         )
 
-        if wandb.run is not None:
+        if self.modules["wandb"].run is not None:
             self.modules["wandb"].finish()
 
     def enhance_yolov5(
@@ -1849,7 +1861,9 @@ class MLProjectProcessor(ProjectProcessor):
         :return: The model_widget is being returned.
         """
         # TODO: Remove hardcoded API key from Zenodo
-        model_dict = self.modules["zenodo_utils"].download_and_extract_models_from_zenodo(
+        model_dict = self.modules[
+            "zenodo_utils"
+        ].download_and_extract_models_from_zenodo(
             "pClzrdKwErArGWuPXMje0OtLEaq2gM8vHcAEeQN9CXyS2IjbuJsw05JLjVII"
         )
         model_info = {v: {"data": "No model info"} for k, v in model_dict.items()}
@@ -1858,12 +1872,14 @@ class MLProjectProcessor(ProjectProcessor):
             # Fetch model artifact list
             from mlflow import MlflowClient
 
-            experiment = mlflow.get_experiment_by_name(self.project_name)
+            experiment = self.modules["mlflow"].get_experiment_by_name(
+                self.project_name
+            )
             client = MlflowClient()
 
             if experiment is not None:
                 experiment_id = experiment.experiment_id if experiment else None
-                runs = mlflow.search_runs(
+                runs = self.modules["mlflow"].search_runs(
                     experiment_ids=experiment_id, output_format="list"
                 )
 
@@ -1911,7 +1927,7 @@ class MLProjectProcessor(ProjectProcessor):
             return model_widget
 
         elif self.registry == "wandb" and not publish:
-            api = wandb.Api()
+            api = self.modules["wandb"].Api()
 
             # weird error fix (initialize api another time)
             if len(custom_project) > 0:
@@ -1934,7 +1950,9 @@ class MLProjectProcessor(ProjectProcessor):
             for run in runs:
                 model_artifacts = [
                     artifact
-                    for artifact in chain(run.logged_artifacts(), run.used_artifacts())
+                    for artifact in self.modules["itertools"].chain(
+                        run.logged_artifacts(), run.used_artifacts()
+                    )
                     if artifact.type == "model"
                 ]
                 if len(model_artifacts) > 0:
@@ -2038,7 +2056,7 @@ class MLProjectProcessor(ProjectProcessor):
         if Path(src).is_dir():
             obj = [f for f in Path(src).iterdir() if f.is_file()]
         else:
-            obj = pims.Video(src)  # store video capture object
+            obj = self.modules["pims"].Video(src)  # store video capture object
         inc = 0
         for r in results:
             fc += 1
@@ -2073,15 +2091,17 @@ class MLProjectProcessor(ProjectProcessor):
         from yolov5.utils.general import increment_path
 
         if self.registry == "mlflow":
-            active_run = mlflow.active_run()
+            active_run = self.modules["mlflow"].active_run()
             if active_run:
-                mlflow.end_run()
-            experiment = mlflow.get_experiment_by_name(self.project_name)
-            mlflow.start_run(
+                self.modules["mlflow"].end_run()
+            experiment = self.modules["mlflow"].get_experiment_by_name(
+                self.project_name
+            )
+            self.modules["mlflow"].start_run(
                 run_name=self.project_name + "_detection",
                 experiment_id=experiment.experiment_id,
             )
-            self.run = mlflow.active_run()
+            self.run = self.modules["mlflow"].active_run()
         elif self.registry == "wandb":
             self.run = self.modules["wandb"].init(
                 entity=self.team_name,
@@ -2413,7 +2433,7 @@ class MLProjectProcessor(ProjectProcessor):
         if self.registry == "wandb":
             self.modules["wandb"].finish()
         elif self.registry == "mlflow":
-            mlflow.end_run()
+            self.modules["mlflow"].end_run()
 
     def download_project_runs(self):
         # Download all the runs from the given project ID using Weights and Biases API,
@@ -2449,7 +2469,7 @@ class MLProjectProcessor(ProjectProcessor):
             return str(Path(model_name).parent)
 
         if self.registry == "mlflow":
-            artifact_dir = mlflow.artifacts.download_artifacts(
+            artifact_dir = self.modules["mlflow"].artifacts.download_artifacts(
                 model_name, dst_path=download_path
             )
             logging.info("MLFLow model successfully loaded.")
@@ -2472,7 +2492,7 @@ class MLProjectProcessor(ProjectProcessor):
                     full_path = f"{self.team_name}/spyfish_aotearoa"
                 else:
                     full_path = f"{self.team_name}/{self.project_name.lower()}"
-            api = wandb.Api()
+            api = self.modules["wandb"].Api()
             try:
                 api.artifact_type(type_name="model", project=full_path).collections()
             except Exception as e:
@@ -2521,7 +2541,7 @@ class MLProjectProcessor(ProjectProcessor):
             )
         best_model = [
             artifact
-            for artifact in chain(
+            for artifact in self.modules["itertools"].chain(
                 best_run["run"].logged_artifacts(), best_run["run"].used_artifacts()
             )
             if artifact.type == "model"
@@ -2557,12 +2577,12 @@ class MLProjectProcessor(ProjectProcessor):
             logging.error("This is not currently supported for MLflow")
             return "", ""
         elif self.registry == "wandb":
-            api = wandb.Api()
+            api = self.modules["wandb"].Api()
             if "_" in model:
                 run_id = model.split("_")[1]
                 try:
                     run = api.run(f"{team_name}/{self.project_name}/runs/{run_id}")
-                except wandb.CommError:
+                except self.modules["wandb"].CommError:
                     logging.error("Run data not found")
                     return "", ""
                 datasets = [
