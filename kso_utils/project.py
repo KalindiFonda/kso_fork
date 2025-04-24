@@ -164,40 +164,6 @@ class ProjectProcessor:
     #############
     # t1
     #############
-
-    def check_basic_meta(self, meta_keys: list = ["species", "sites", "movies"]):
-        col_reqs = {
-            "sites": [
-                "siteName",
-                "decimalLatitude",
-                "decimalLongitude",
-                "geodeticDatum",
-                "countryCode",
-            ],
-            "species": [
-                "commonName",
-                "scientificName",
-                "taxonRank",
-                "kingdom",
-            ],
-            "movies": [
-                "filename",
-                "siteName",
-                "created_on",
-                "author",
-            ],
-        }
-        for meta_key, meta_path in self.csv_paths.items():
-            # Remove extra information from key
-            meta_key = meta_key.split("_")[1]
-            if meta_key in meta_keys:
-                return db_utils.check_basic_meta(
-                    meta_key=meta_key,
-                    meta_path=meta_path,
-                    conn=self.db_connection,
-                    keys=col_reqs[meta_key],
-                )
-
     def select_meta_range(self, meta_key: str):
         """
         > This function takes a meta key as input and returns a dataframe, range of rows, and range of
@@ -213,22 +179,6 @@ class ProjectProcessor:
             csv_paths=self.csv_paths,
         )
         return meta_df, range_rows, range_columns
-
-    def edit_meta(self, meta_df: pd.DataFrame, range_rows, range_columns):
-        """
-        > This function opens a Google Sheet with the dataframe passed as an argument
-
-        :param meta_df: the dataframe that contains the metadata
-        :type meta_df: pd.DataFrame
-        :param range_rows: a list of row numbers to include in the sheet
-        :param range_columns: a list of columns to display in the sheet
-        :return: df_filtered, sheet
-        """
-        df_filtered, sheet = kso_widgets.open_csv(
-            df=meta_df, df_range_rows=range_rows, df_range_columns=range_columns
-        )
-        display(sheet)
-        return df_filtered, sheet
 
     def view_meta_changes(self, df_filtered, sheet):
         """
@@ -282,15 +232,6 @@ class ProjectProcessor:
         )
 
         logging.info("Information of available movies has been retrieved")
-
-    def load_movie(self, filepath):
-        """
-        It takes a filepath, and returns a movie path
-
-        :param filepath: The path to the movie file
-        :return: The movie path.
-        """
-        return movie_utils.get_movie_path(filepath, self)
 
     def choose_footage_source(self):
         """
@@ -358,25 +299,6 @@ class ProjectProcessor:
             server_connection=self.server_connection,
         )
 
-    def check_meta_sync(self, meta_key: str):
-        """
-        It checks if the local and server versions of a metadata file are the same
-
-        :param meta_key: str
-        :type meta_key: str
-        :return: The return value is a list of the names of the files in the directory.
-        """
-        try:
-            local_csv, server_csv = getattr(
-                self, "local_" + meta_key + "_csv"
-            ), getattr(self, "server_" + meta_key + "_csv")
-            common_keys = np.intersect1d(local_csv.columns, server_csv.columns)
-            assert local_csv[common_keys].equals(server_csv[common_keys])
-            logging.info(f"Local and server versions of {meta_key} are synced.")
-        except AssertionError:
-            logging.error(f"Local and server versions of {meta_key} are not synced.")
-            return
-
     def check_movies_meta(
         self,
         review_method: str,
@@ -407,136 +329,14 @@ class ProjectProcessor:
         if df is not None:
             self.temp_local_movies = df
 
-    def concatenate_local_movies(self):
-        movie_utils.concatenate_local_movies(self.csv_paths)
-
     def check_species_meta(self):
         return db_utils.check_species_meta(
             csv_paths=self.csv_paths, conn=self.db_connection
         )
 
-    def check_sites_meta(self):
-        # TODO: code for processing sites metadata (t1_utils.check_sites_csv)
-        pass
-
     #############
     # t2
     #############
-
-    def upload_movies(self, movie_list: list):
-        """
-        It uploads the new movies to the SNIC server and creates new rows to be updated
-        with movie metadata and saved into movies.csv
-
-        :param movie_list: list of new movies that are to be added to movies.csv
-        """
-        # Get number of new movies to be added
-        movie_folder = self.project.movie_folder
-        number_of_movies = len(movie_list)
-        # Get current movies
-        movies_df = pd.read_csv(self.csv_paths["local_movies_csv"])
-        # Set up a new row for each new movie
-        new_movie_rows_sheet = ipysheet.sheet(
-            rows=number_of_movies,
-            columns=movies_df.shape[1],
-            column_headers=movies_df.columns.tolist(),
-        )
-        if len(movie_list) == 0:
-            logging.error("No valid movie found to upload.")
-            return
-        for index, movie in enumerate(movie_list):
-            remote_fpath = Path(f"{movie_folder}", movie[1])
-            if Path(remote_fpath).exists():
-                logging.info(
-                    "Filename "
-                    + str(movie[1])
-                    + " already exists on SNIC, try again with a new file"
-                )
-                return
-            else:
-                # process video
-                stem = "processed"
-                p = Path(movie[0])
-                processed_video_path = p.with_name(f"{p.stem}_{stem}{p.suffix}").name
-                logging.info("Movie to be uploaded: " + processed_video_path)
-                ffmpeg.input(p).output(
-                    processed_video_path,
-                    crf=22,
-                    pix_fmt="yuv420p",
-                    vcodec="libx264",
-                    threads=4,
-                ).run(capture_stdout=True, capture_stderr=True, overwrite_output=True)
-
-                shutil.copy2(str(processed_video_path), str(remote_fpath))
-                logging.info("movie uploaded\n")
-            # Fetch movie metadata that can be calculated from movie file
-            fps, duration = movie_utils.get_fps_duration(movie[0])
-            movie_id = str(max(movies_df["movie_id"]) + 1)
-            ipysheet.cell(index, 0, movie_id)
-            ipysheet.cell(index, 1, movie[1])
-            ipysheet.cell(index, 2, "-")
-            ipysheet.cell(index, 3, "-")
-            ipysheet.cell(index, 4, "-")
-            ipysheet.cell(index, 5, fps)
-            ipysheet.cell(index, 6, duration)
-            ipysheet.cell(index, 7, "-")
-            ipysheet.cell(index, 8, "-")
-        logging.info("All movies uploaded:\n")
-        logging.info(
-            "Complete this sheet by filling the missing info on the movie you just uploaded"
-        )
-        display(new_movie_rows_sheet)
-        return new_movie_rows_sheet
-
-    def add_movies(self):
-        """
-        > It creates a button that, when clicked, creates a new button that, when clicked, saves the
-        changes to the local csv file of the new movies that should be added. It creates a metadata row
-        for each new movie, which should be filled in by the user before uploading can continue.
-        """
-        movie_list = kso_widgets.choose_new_videos_to_upload()
-        button = widgets.Button(
-            description="Click to upload movies",
-            disabled=False,
-            display="flex",
-            flex_flow="column",
-            align_items="stretch",
-            style={"width": "initial"},
-        )
-
-        def on_button_clicked(b):
-            new_sheet = self.upload_movies(movie_list)
-            button2 = widgets.Button(
-                description="Save changes",
-                disabled=False,
-                display="flex",
-                flex_flow="column",
-                align_items="stretch",
-                style={"width": "initial"},
-            )
-
-            def on_button_clicked2(b):
-                movies_df = pd.read_csv(self.csv_paths["local_movies_csv"])
-                new_movie_rows_df = ipysheet.to_dataframe(new_sheet)
-                self.local_movies_csv = pd.concat(
-                    [movies_df, new_movie_rows_df], ignore_index=True
-                )
-                logging.info("Changed saved locally")
-
-            button2.on_click(on_button_clicked2)
-            display(button2)
-
-        button.on_click(on_button_clicked)
-
-        # TO BE COMPLETED with Cloudina
-        # upload new movies and update csvs
-        display(button)
-
-    def add_sites(self):
-        pass
-
-    def add_species(self):
-        pass
 
     #############
     # t3
@@ -745,9 +545,7 @@ class ProjectProcessor:
             subject_type=workflow_checks["Subject type: #0"],
         )
 
-    def aggregate_zoo_classifications(
-        self, agg_params, users: list
-    ):
+    def aggregate_zoo_classifications(self, agg_params, users: list):
         workflow_checks = self.workflow_widget.checks
 
         if isinstance(users, list):
@@ -786,9 +584,7 @@ class ProjectProcessor:
             # Use all polygons
             self.aggregated_zoo_classifications = classifications_filtered
 
-    def extract_zoo_frames(
-        self, n_frames_subject: int = 3, subsample_up_to: int = 100
-    ):
+    def extract_zoo_frames(self, n_frames_subject: int = 3, subsample_up_to: int = 100):
         if not isinstance(self.species_of_interest, list):
             self.species_of_interest = self.species_of_interest.value
         species_list = self.species_of_interest
@@ -976,22 +772,6 @@ class ProjectProcessor:
         kso_widgets.explore_classifications_per_subject(
             class_df=self.processed_zoo_classifications,
             subject_type=self.workflow_widget.checks["Subject type: #0"],
-        )
-
-    def get_classifications(
-        self,
-        workflow_dict: dict,
-        workflows_df: pd.DataFrame,
-        subj_type: str,
-        class_df: pd.DataFrame,
-    ):
-        return zoo_utils.get_classifications(
-            project=self.project,
-            conn=self.db_connection,
-            workflow_dict=workflow_dict,
-            workflows_df=workflows_df,
-            subj_type=subj_type,
-            class_df=class_df,
         )
 
     def launch_classifications_table(self):
@@ -1662,42 +1442,6 @@ class MLProjectProcessor(ProjectProcessor):
         elif self.registry == "mlflow":
             self.modules["mlflow"].end_run()
 
-    def train_yolov5(
-        self, exp_name, weights, project, epochs=50, batch_size=16, img_size=[640, 640]
-    ):
-        if self.project.server == "SNIC":
-            project = f"/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir/{project}"
-
-        if self.model_type == 1:
-            self.modules["train"].run(
-                entity=self.team_name,
-                data=self.data_path,
-                hyp=self.hyp_path,
-                weights=weights,
-                project=project,
-                name=exp_name,
-                imgsz=img_size,
-                batch_size=int(batch_size),
-                epochs=epochs,
-                single_cls=False,
-                cache_images=True,
-                upload_dataset=True,
-                rect=True,
-            )
-        elif self.model_type == 2:
-            self.modules["train"].run(
-                entity=self.team_name,
-                data=self.data_path,
-                model=weights,
-                project=self.project_name,
-                name=exp_name,
-                img_size=img_size,
-                batch_size=int(batch_size),
-                epochs=epochs,
-            )
-        else:
-            logging.error("Segmentation model training not yet supported.")
-
     def enhance_yolo(
         self, in_path: str, project_path: str, conf_thres: float, img_size=[640, 640]
     ):
@@ -1718,34 +1462,6 @@ class MLProjectProcessor(ProjectProcessor):
 
         if self.modules["wandb"].run is not None:
             self.modules["wandb"].finish()
-
-    def enhance_yolov5(
-        self, in_path: str, project_path: str, conf_thres: float, img_size=[640, 640]
-    ):
-        from datetime import datetime
-
-        run_name = f"enhance_run_{datetime.now()}"
-        self.run_path = Path(project_path, run_name)
-        if self.model_type == 1:
-            logging.info("Enhancement running...")
-            self.modules["detect"].run(
-                weights=self.tuned_weights,
-                source=str(Path(in_path, "images")),
-                project=project_path,
-                name=run_name,
-                imgsz=img_size,
-                conf_thres=conf_thres,
-                save_txt=True,
-            )
-            self.modules["wandb"].finish()
-        elif self.model_type == 2:
-            logging.info(
-                "Enhancements not supported for image classification models at this time."
-            )
-        else:
-            logging.info(
-                "Enhancements not supported for segmentation models at this time."
-            )
 
     def enhance_replace(self, data_path: str):
         if self.model_type == 1:
@@ -1934,26 +1650,6 @@ class MLProjectProcessor(ProjectProcessor):
             model.val(
                 data=self.data_path,
                 conf=conf_thres,
-            )
-        except Exception as e:
-            logging.error(f"Encountered {e}, terminating run...")
-            self.modules["wandb"].finish()
-        logging.info("Run succeeded, finishing run...")
-        self.modules["wandb"].finish()
-
-    def eval_yolov5(self, exp_name: str, conf_thres: float):
-        # Find trained model weights
-        project_path = Path(self.project_name, exp_name)
-        self.tuned_weights = f"{Path(project_path, 'weights', 'best.pt')}"
-        try:
-            self.modules["val"].run(
-                data=self.data_path,
-                weights=self.tuned_weights,
-                conf_thres=conf_thres,
-                imgsz=640 if self.model_type == 1 else 224,
-                half=False,
-                project=self.project_name,
-                name=str(exp_name) + "_val",
             )
         except Exception as e:
             logging.error(f"Encountered {e}, terminating run...")
@@ -2191,72 +1887,6 @@ class MLProjectProcessor(ProjectProcessor):
             logging.error("Invalid registry name")
             return
 
-    def save_detections_wandb(self, conf_thres: float, model: str, eval_dir: str):
-        yolo_utils.set_config(
-            conf=conf_thres, model_name=model, evaluation_directory=eval_dir
-        )
-        import shutil
-
-        shutil.make_archive(Path(eval_dir, "labels"), "zip", Path(eval_dir, "labels"))
-        yolo_utils.add_data(
-            path=Path(eval_dir, "labels.zip"),
-            name="detection_output",
-            registry=self.registry,
-            run=self.run,
-        )
-        self.csv_report = yolo_utils.generate_csv_report(
-            eval_dir,
-            log=True,
-            registry=self.registry,
-            movie_csv_df=self.local_movies_csv,
-        )
-        yolo_utils.add_data(
-            path=Path(eval_dir, "annotations.csv"),
-            name="detection_output",
-            registry=self.registry,
-            run=self.run,
-        )
-
-    def segment_footage(self, source: str):
-        # This is a draft function for using FastSAM to identify objects
-        model = self.modules["ultralytics"].FastSAM("FastSAM-s.pt")
-        # Run inference on a frame
-        everything_results = model(
-            source, device="cpu", retina_masks=True, imgsz=128, conf=0.4, iou=0.9
-        )
-        # Prepare a Prompt Process object
-        prompt_process = self.modules["ultralytics"].models.fastsam.FastSAMPrompt(
-            source, everything_results, device="cpu"
-        )
-        # Everything prompt
-        ann = prompt_process.everything_prompt()
-        prompt_process.plot(annotations=ann, output="./")
-        return ann
-
-    def track_yolo(
-        self,
-        source: str,
-        artifact_dir: str,
-        conf_thres: float,
-    ):
-        model = self.modules["ultralytics"].YOLO(
-            [
-                str(f)
-                for f in Path(artifact_dir).iterdir()
-                if f.is_file()
-                and str(f).endswith((".pt", ".model"))
-                and "osnet" not in str(f)
-                and "best" in str(f)
-            ][0]
-        )
-        latest_tracker = model.track(
-            source=source,
-            conf=conf_thres,
-            persist=True,
-        )
-        return latest_tracker
-        # self.modules["wandb"].finish()
-
     def _increment_path(self, path, exist_ok=False, sep="", mkdir=False):
         # Increment file or directory path, i.e. runs/exp --> runs/exp{sep}2, runs/exp{sep}3, ... etc.
         path = Path(path)  # os-agnostic
@@ -2293,7 +1923,9 @@ class MLProjectProcessor(ProjectProcessor):
     ):
         if not hasattr(self, "eval_dir"):
             self.eval_dir = str(
-                self._increment_path(path=Path(self.save_dir) / "detect", exist_ok=False)
+                self._increment_path(
+                    path=Path(self.save_dir) / "detect", exist_ok=False
+                )
             )
 
         latest_tracker = yolo_utils.track_objects(
@@ -2341,23 +1973,6 @@ class MLProjectProcessor(ProjectProcessor):
             self.modules["wandb"].finish()
         elif self.registry == "mlflow":
             self.modules["mlflow"].end_run()
-
-    def download_project_runs(self):
-        # Download all the runs from the given project ID using Weights and Biases API,
-        # sort them by the specified metric, and assign them to the run_history attribute
-
-        self.modules["wandb"].login()
-        runs = self.modules["wandb"].Api().runs(f"{self.team_name}/{self.project_name}")
-        self.run_history = []
-        for run in runs:
-            run_info = {}
-            run_info["run"] = run
-            metrics = run.history()
-            run_info["metrics"] = metrics
-            self.run_history.append(run_info)
-        # self.run_history = sorted(
-        #    self.run_history, key=lambda x: x["metrics"]["metrics/"+sort_metric]
-        # )
 
     def get_model(self, model_name: str, download_path: str, custom_project: str = ""):
         """
@@ -2425,46 +2040,6 @@ class MLProjectProcessor(ProjectProcessor):
             return str(Path(artifact_dir).resolve())
         else:
             return
-
-    def get_best_model(self, metric="mAP_0.5", download_path: str = ""):
-        # Get the best model from the run history according to the specified metric
-        if isinstance(self.run_history, list) and len(self.run_history) > 0:
-            best_run = self.run_history[0]
-        else:
-            self.download_project_runs()
-            if self.run_history:
-                best_run = self.run_history[0]
-            else:
-                best_run = None
-        try:
-            best_metric = best_run["metrics"][metric]
-            for run in self.run_history:
-                if run["metrics"][metric] < best_metric:
-                    best_run = run
-                    best_metric = run["metrics"][metric]
-        except KeyError:
-            logging.error(
-                "No run with the given metric has been recorded. Using first run as best run."
-            )
-        best_model = [
-            artifact
-            for artifact in self.modules["itertools"].chain(
-                best_run["run"].logged_artifacts(), best_run["run"].used_artifacts()
-            )
-            if artifact.type == "model"
-        ][0]
-
-        api = self.modules["wandb"].Api()
-        artifact = api.artifact(
-            f"{self.team_name}/{self.project_name}"
-            + "/"
-            + best_model.name.split(":")[0]
-            + ":latest"
-        )
-        logging.info("Downloading model checkpoint...")
-        artifact_dir = artifact.download(root=download_path)
-        logging.info("Checkpoint downloaded.")
-        self.best_model_path = Path(artifact_dir).resolve()
 
     def get_dataset(
         self,
