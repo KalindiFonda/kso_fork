@@ -1293,10 +1293,10 @@ def populate_subjects(
     # Set the subject columns in the right order
     subjects = subjects[required_cols]
 
-    from kso_utils.db_utils import test_table, add_to_table, get_df_from_db_table
+    from kso_utils.db_utils import test_table_for_none, add_to_table, get_df_from_db_table
 
     # Test table validity
-    test_table(subjects, "subjects", keys=["id"])
+    test_table_for_none(subjects, "subjects", keys=["id"])
 
     # Add values to subjects
     add_to_table(

@@ -74,7 +74,7 @@ def add_to_table(
     logging.info(f"Updated {table_name} table from the temporary database")
 
 
-def test_table(df: pd.DataFrame, table_name: str, keys: list = ["id"]):
+def test_table_for_none(df: pd.DataFrame, table_name: str, keys: list = ["id"]):
     """
     The function checks if a given DataFrame has any NULL values in the specified key columns and logs
     an error message if it does.
@@ -84,7 +84,7 @@ def test_table(df: pd.DataFrame, table_name: str, keys: list = ["id"]):
     :param table_name: The name of the table being tested, which is a string
     :type table_name: str
     :param keys: The `keys` parameter is a list of column names that are used as keys to uniquely
-    identify each row in the DataFrame `df`. The function `test_table` checks that there are no NULL
+    identify each row in the DataFrame `df`. The function `test_table_for_none` checks that there are no NULL
     values in these key columns, which would indicate that some rows were not properly matched
     :type keys: list
     """
@@ -316,7 +316,7 @@ def process_test_csv(
     assert set(local_df.columns) == set(schema_col_names), f"csv columns and db table columns for {init_key} do not match. The df contains {local_df.columns} and the sql table requires {schema_col_names}. Make sure they contain the same columns."
 
     # Roadblock to prevent empty rows in id_columns
-    test_table(local_df, init_key, [local_df.columns[0]])
+    test_table_for_none(local_df, init_key, [local_df.columns[0]])
 
     # Reorder the colums so they are in the order of schema
     # Otherwise the data will be added to the wrong key
@@ -336,9 +336,9 @@ def check_basic_meta(
     df_to_db = test_df[[c for c in test_df.columns if c in field_names]]
     # Double-check to prevent missing key information
     if len(keys) == 0:
-        test_table(df_to_db, meta_key, df_to_db.columns)
+        test_table_for_none(df_to_db, meta_key, df_to_db.columns)
     else:
-        test_table(df_to_db, meta_key, keys)
+        test_table_for_none(df_to_db, meta_key, keys)
 
     logging.info(f"The {meta_key} dataframe is complete")
 
@@ -361,7 +361,7 @@ def check_species_meta(csv_paths: dict, conn: sqlite3.Connection):
     df_to_db = species_df[[c for c in species_df.columns if c in field_names]]
 
     # Roadblock to prevent empty lat/long/datum/countrycode
-    test_table(df_to_db, "species", df_to_db.columns)
+    test_table_for_none(df_to_db, "species", df_to_db.columns)
 
     logging.info("The species dataframe is complete")
 
