@@ -88,15 +88,7 @@ def test_table(df: pd.DataFrame, table_name: str, keys: list = ["id"]):
     values in these key columns, which would indicate that some rows were not properly matched
     :type keys: list
     """
-    try:
-        # check that there are no id columns with a NULL value, which means that they were not matched
-        assert len(df[df[keys].isnull().any(axis=1)]) == 0
-    except AssertionError:
-        logging.error(
-            f"The table {table_name} has invalid entries, please ensure that all columns are non-zero"
-        )
-        logging.error(f"The invalid entries are {df[df[keys].isnull().any(axis=1)]}")
-
+    assert len(df[df[keys].isnull().any(axis=1)]) == 0, f"The table {table_name} has invalid entries, please ensure that all columns are non-zero. The invalid entries are {df[df[keys].isnull().any(axis=1)]}"
 
 def get_df_from_db_table(conn: sqlite3.Connection, table_name: str):
     """
@@ -300,67 +292,35 @@ def process_test_csv(
         df=local_df,
     )
 
-    # Set the id of the df of interest
-    if init_key == "sites":
-        table_id = "site_id"
+    # Map the init_key to the table_id from the csv
+    table_id = {"sites":"site_id", "movies":"movie_id","species":"species_id", "photos":"ID"}
+    assert init_key in table_id.keys(), f"init_key should be one of {table_id.keys()} so that the db has a table for it, but instead got {init_key}"
 
-    elif init_key == "movies":
-        table_id = "movie_id"
+    # For Spyfish_Aotearoa: Select only movies that are a good deployment / have good visibility
+    if init_key == "movies":
+        if project.Project_name in ["Spyfish_Aotearoa"]:
+            assert "IsBadDeployment" in local_df, "The movies csv from Spyfish_Aotearoa expects to have a column called IsBadDeployment, but it is missing."
+            # Check for missing values in IsBadDeployment column
+            if local_df["IsBadDeployment"].isnull().any():
+                raise ValueError(
+                    "The 'IsBadDeployment' column contains missing values. Please handle missing values before proceeding."
+                )
+            else:
+                local_df = local_df.loc[~local_df.IsBadDeployment].drop("IsBadDeployment", axis=1)
 
-        from kso_utils.movie_utils import select_project_movies
+    # Rename id columns to simply "id"
+    local_df = local_df.rename(columns={table_id[init_key]:"id"})
 
-        # Select only the movies that are relevant to the project
-        local_df = select_project_movies(project, local_df)
-
-        # Reference movies with their respective sites
-        sites_df = get_df_from_db_table(conn, "sites")[["id", "siteName"]].rename(
-            columns={"id": "site_id"}
-        )
-
-        # Merge df (aka movies) and sites dfs
-        local_df = pd.merge(local_df, sites_df, how="left", on="siteName")
-
-    elif init_key == "species":
-        table_id = "species_id"
-
-    elif init_key == "photos":
-        table_id = "ID"
-
-    else:
-        logging.error(
-            f"{init_key} has not been processed because the db schema does not have a table for it"
-        )
-
-    # Create a dictionary with the table-specific column id and its schema match
-    id_lookup = {table_id: "id"}
-
-    # Rename id columns using the dictionary
-    local_df = local_df.rename(columns=id_lookup)
-
-    # Roadblock to ensure cols match schema
-    ##################
-    # Get the "standard" schema column names of the table of interest
-    col_names_dic = get_column_names_db(conn, init_key)
-
-    # Check the column names of the df are standard
-    column_names = local_df.columns
-    required_columns = col_names_dic.values()
-
-    # Modify the dictionary if the df has different column names
-    if not all(col in column_names for col in required_columns):
-        missing_cols = [col for col in required_columns if col not in column_names]
-        # Log the issue
-        logging.error(
-            f"{missing_cols} column(s) not found and"
-            f" are required for the {init_key}'s schema table"
-            f" The col names are:{column_names}"
-        )
-
-    # Select only columns that have fields in the sql table
-    local_df = local_df[[c for c in required_columns if c in local_df.columns]]
+    # Ensure cols of df match db schema
+    schema_col_names = get_column_names_db(conn, init_key).values()
+    assert set(local_df.columns) == set(schema_col_names), f"csv columns and db table columns for {init_key} do not match. The df contains {local_df.columns} and the sql table requires {schema_col_names}. Make sure they contain the same columns."
 
     # Roadblock to prevent empty rows in id_columns
     test_table(local_df, init_key, [local_df.columns[0]])
+
+    # Reorder the colums so they are in the order of schema
+    # Otherwise the data will be added to the wrong key
+    local_df = local_df[[c for c in schema_col_names]]
 
     return local_df
 

@@ -188,3 +188,162 @@ def test_rename_to_schema():
     assert (
         "sampling_start" in df_koster_renamed.columns
     ), f"If the renaming was successfull, 'sampling_start' should have replaced 'SamplingStart'. But it did not, the column names of the renamed df are {df_koster_renamed.columns}"
+
+
+def test_process_test_csv(connection):
+    template_project = project_utils.find_project("Template project")
+
+    # First test if a correct df passes
+    df_template = pd.DataFrame(
+        [
+            [1, "Nothing here", "Not applicable", "Not applicable", "Not applicable"],
+            [2, "Banded weedfish", "Ericentrus rubrus", "species", "Animalia"],
+            [3, "Banded wrasse", "Notolabrus fucicola", "species", "Animalia"],
+        ],
+        columns=["species_id", "commonName", "scientificName", "taxonRank", "kingdom"],
+    )
+    db_utils.process_test_csv(connection, template_project, df_template, "species")
+
+    # Test if error gets raised when the cols do not match db schema
+    df_wrong_col = pd.DataFrame(
+        [
+            [1, "Nothing here", "Not applicable", "Not applicable", "Not applicable"],
+            [2, "Banded weedfish", "Ericentrus rubrus", "species", "Animalia"],
+            [3, "Banded wrasse", "Notolabrus fucicola", "species", "Animalia"],
+        ],
+        columns=[
+            "species_id",
+            "common_Name",
+            "scientific_Name",
+            "taxonRank",
+            "kingdom",
+        ],
+    )
+    with pytest.raises(AssertionError, match="csv columns and db table columns for"):
+        db_utils.process_test_csv(connection, template_project, df_wrong_col, "species")
+
+    # Test spyfish movies
+    spyfish_project = project_utils.find_project("Spyfish_Aotearoa")
+    df_movies_valueerror = pd.DataFrame(
+        [
+            [
+                1,
+                "movie_1.mp4",
+                "Site_1",
+                "13/08/2021",
+                "Author_name_1",
+                25.0,
+                10.12,
+                0.0,
+                10.12,
+                "https://www.wildlife.ai/wp-content/uploads/2022/06/movie_1.mp4",
+                None,  # This should give the value error
+            ],
+            [
+                2,
+                "movie_2.mp4",
+                "Site_1",
+                "13/08/2021",
+                "Author_name_2",
+                29.97002997002997,
+                10.043366666666667,
+                0.0,
+                10.043366666666667,
+                "https://www.wildlife.ai/wp-content/uploads/2022/06/movie_2.mp4",
+                True,
+            ],
+        ],
+        columns=[
+            "movie_id",
+            "filename",
+            "siteName",
+            "created_on",
+            "author",
+            "fps",
+            "duration",
+            "sampling_start",
+            "sampling_end",
+            "fpath",
+            "IsBadDeployment",
+        ],
+    )
+    with pytest.raises(ValueError, match="The 'IsBadDeployment' column"):
+        db_utils.process_test_csv(
+            connection, spyfish_project, df_movies_valueerror, "movies"
+        )
+
+    df_movies_correct = pd.DataFrame(
+        [
+            [
+                1,
+                "movie_1.mp4",
+                "Site_1",
+                "13/08/2021",
+                "Author_name_1",
+                25.0,
+                10.12,
+                0.0,
+                10.12,
+                "https://www.wildlife.ai/wp-content/uploads/2022/06/movie_1.mp4",
+                False,
+            ],
+            [
+                2,
+                "movie_2.mp4",
+                "Site_1",
+                "13/08/2021",
+                "Author_name_2",
+                29.97002997002997,
+                10.043366666666667,
+                0.0,
+                10.043366666666667,
+                "https://www.wildlife.ai/wp-content/uploads/2022/06/movie_2.mp4",
+                True,
+            ],
+        ],
+        columns=[
+            "movie_id",
+            "filename",
+            "siteName",
+            "created_on",
+            "author",
+            "fps",
+            "duration",
+            "sampling_start",
+            "sampling_end",
+            "fpath",
+            "IsBadDeployment",
+        ],
+    )
+    df = db_utils.process_test_csv(
+        connection, spyfish_project, df_movies_correct, "movies"
+    )
+    assert (
+        len(df) == 1
+    ), f"Expected to keep 1 row of data in spyfish, instead got {len(df)}"
+
+    df_missing_isbaddeployment = pd.DataFrame(
+        [[1, "movie_1.mp4"], [2, "movie_2.mp4"]], columns=["movie_id", "filename"]
+    )
+    with pytest.raises(
+        AssertionError, match="The movies csv from Spyfish_Aotearoa expects"
+    ):
+        db_utils.process_test_csv(
+            connection, spyfish_project, df_missing_isbaddeployment, "movies"
+        )
+
+
+def test_test_table_for_none():
+    df_missing_id = pd.DataFrame(
+        [
+            [1, "Nothing here", "Not applicable", "Not applicable", "Not applicable"],
+            [2, "Banded weedfish", "Ericentrus rubrus", "species", "Animalia"],
+            [None, "Banded wrasse", "Notolabrus fucicola", "species", "Animalia"],
+        ],
+        columns=["species_id", "commonName", "scientificName", "taxonRank", "kingdom"],
+    )
+    with pytest.raises(AssertionError, match="has invalid entries"):
+        db_utils.test_table_for_none(df_missing_id, "species", ["species_id"])
+
+
+# populate_db calls upon process_test_csv and add_to_table which are both already tested, or their building blocks.
