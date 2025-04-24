@@ -24,11 +24,9 @@ import kso_utils.project_utils as project_utils
 import kso_utils.db_utils as db_utils
 import kso_utils.movie_utils as movie_utils
 import kso_utils.server_utils as server_utils
-import kso_utils.zooniverse_utils as zoo_utils
 import kso_utils.general as g_utils
 import kso_utils.widgets as kso_widgets
 import kso_utils.yolo_utils as yolo_utils
-import kso_utils.zenodo_utils as zenodo_utils
 
 # Logging
 logging.basicConfig()
@@ -1353,7 +1351,7 @@ class MLProjectProcessor(ProjectProcessor):
         # Replace cv2.VideoWriter with the patched version
         cv2.VideoWriter = CustomVideoWriter
 
-        self.modules = g_utils.import_modules(["yolo_utils"], utils=True)
+        self.modules = g_utils.import_modules(["zenodo_utils"], utils=True)
         self.modules.update(
             g_utils.import_modules(
                 ["torch", "wandb", "yaml", "ultralytics"],
@@ -1389,7 +1387,7 @@ class MLProjectProcessor(ProjectProcessor):
             ).label.tolist()
 
             # code for prepare dataset for machine learning
-            self.modules["yolo_utils"].frame_aggregation(
+            yolo_utils.frame_aggregation(
                 project=self.project,
                 server_connection=self.server_connection,
                 db_connection=self.db_connection,
@@ -1421,7 +1419,7 @@ class MLProjectProcessor(ProjectProcessor):
             def on_button_clicked(b):
                 self.species_of_interest = species_list.value
                 # code for prepare dataset for machine learning
-                self.modules["yolo_utils"].frame_aggregation(
+                yolo_utils.frame_aggregation(
                     project=self.project,
                     server_connection=self.server_connection,
                     db_connection=self.db_connection,
@@ -1616,11 +1614,11 @@ class MLProjectProcessor(ProjectProcessor):
         if not isinstance(self.output_path, str) and self.output_path is not None:
             self.output_path = self.output_path.selected
         if test:
-            self.data_path, self.hyp_path = self.modules["yolo_utils"].setup_paths(
+            self.data_path, self.hyp_path = yolo_utils.setup_paths(
                 Path(self.output_path, "ml-template-data"), self.model_type
             )
         else:
-            self.data_path, self.hyp_path = self.modules["yolo_utils"].setup_paths(
+            self.data_path, self.hyp_path = yolo_utils.setup_paths(
                 self.output_path, self.model_type
             )
 
@@ -1851,7 +1849,7 @@ class MLProjectProcessor(ProjectProcessor):
         :return: The model_widget is being returned.
         """
         # TODO: Remove hardcoded API key from Zenodo
-        model_dict = zenodo_utils.download_and_extract_models_from_zenodo(
+        model_dict = self.modules["zenodo_utils"].download_and_extract_models_from_zenodo(
             "pClzrdKwErArGWuPXMje0OtLEaq2gM8vHcAEeQN9CXyS2IjbuJsw05JLjVII"
         )
         model_info = {v: {"data": "No model info"} for k, v in model_dict.items()}
@@ -2197,20 +2195,20 @@ class MLProjectProcessor(ProjectProcessor):
                 logging.info(f"An unexpected error occurred: {e}")
                 species_mapping = {}
 
-            self.modules["yolo_utils"].set_config(
+            yolo_utils.set_config(
                 conf=conf_thres,
                 model_name=model,
                 evaluation_directory=eval_dir,
                 species_map=species_mapping,
             )
-            self.csv_report = self.modules["yolo_utils"].generate_csv_report(
+            self.csv_report = yolo_utils.generate_csv_report(
                 evaluation_path=eval_dir,
                 log=True,
                 registry=self.registry,
                 movie_csv_df=self.local_movies_csv,
                 out_format=out_format,
             )
-            self.modules["yolo_utils"].add_data(
+            yolo_utils.add_data(
                 Path(eval_dir, "annotations.csv"),
                 "detection_output",
                 self.registry,
@@ -2221,21 +2219,21 @@ class MLProjectProcessor(ProjectProcessor):
             shutil.make_archive(
                 Path(eval_dir, "labels"), "zip", Path(eval_dir, "labels")
             )
-            self.modules["yolo_utils"].add_data(
+            yolo_utils.add_data(
                 Path(eval_dir, "labels"),
                 "detection_output",
                 self.registry,
                 self.run,
             )
         elif self.registry == "mlflow":
-            self.csv_report = self.modules["yolo_utils"].generate_csv_report(
+            self.csv_report = yolo_utils.generate_csv_report(
                 evaluation_path=eval_dir,
                 log=True,
                 registry=self.registry,
                 movie_csv_df=self.local_movies_csv,
                 out_format=out_format,
             )
-            self.modules["yolo_utils"].add_data(
+            yolo_utils.add_data(
                 path=Path(eval_dir, "annotations.csv"),
                 name="detection_output",
                 registry=self.registry,
@@ -2246,14 +2244,14 @@ class MLProjectProcessor(ProjectProcessor):
             shutil.make_archive(
                 Path(eval_dir, "labels"), "zip", Path(eval_dir, "labels")
             )
-            self.modules["yolo_utils"].add_data(
+            yolo_utils.add_data(
                 path=Path(eval_dir, "labels.zip"),
                 name="detection_output",
                 registry=self.registry,
                 run=self.run,
             )
         elif self.registry is None:
-            self.csv_report = self.modules["yolo_utils"].generate_csv_report(
+            self.csv_report = yolo_utils.generate_csv_report(
                 evaluation_path=eval_dir,
                 log=True,
                 registry=self.registry,
@@ -2265,25 +2263,25 @@ class MLProjectProcessor(ProjectProcessor):
             return
 
     def save_detections_wandb(self, conf_thres: float, model: str, eval_dir: str):
-        self.modules["yolo_utils"].set_config(
+        yolo_utils.set_config(
             conf=conf_thres, model_name=model, evaluation_directory=eval_dir
         )
         import shutil
 
         shutil.make_archive(Path(eval_dir, "labels"), "zip", Path(eval_dir, "labels"))
-        self.modules["yolo_utils"].add_data(
+        yolo_utils.add_data(
             path=Path(eval_dir, "labels.zip"),
             name="detection_output",
             registry=self.registry,
             run=self.run,
         )
-        self.csv_report = self.modules["yolo_utils"].generate_csv_report(
+        self.csv_report = yolo_utils.generate_csv_report(
             eval_dir,
             log=True,
             registry=self.registry,
             movie_csv_df=self.local_movies_csv,
         )
-        self.modules["yolo_utils"].add_data(
+        yolo_utils.add_data(
             path=Path(eval_dir, "annotations.csv"),
             name="detection_output",
             registry=self.registry,
@@ -2370,7 +2368,7 @@ class MLProjectProcessor(ProjectProcessor):
                 self.increment_path(path=Path(self.save_dir) / "detect", exist_ok=False)
             )
 
-        latest_tracker = self.modules["yolo_utils"].track_objects(
+        latest_tracker = yolo_utils.track_objects(
             name=name,
             source_dir=source,
             artifact_dir=artifact_dir,
@@ -2389,16 +2387,16 @@ class MLProjectProcessor(ProjectProcessor):
                 name="track",
                 settings=self.modules["wandb"].Settings(start_method="thread"),
             )
-            self.modules["yolo_utils"].set_config(
+            yolo_utils.set_config(
                 conf=conf_thres,
                 model_name=artifact_dir,
                 evaluation_directory=self.eval_dir,
             )
 
-        # self.csv_report = self.modules["yolo_utils"].generate_csv_report(
+        # self.csv_report = yolo_utils.generate_csv_report(
         #    self.team_name, self.project_name, eval_dir, self.run, log=True
         # )
-        self.tracking_report = self.modules["yolo_utils"].generate_counts(
+        self.tracking_report = yolo_utils.generate_counts(
             self.eval_dir,
             latest_tracker,
             artifact_dir,
@@ -2406,7 +2404,7 @@ class MLProjectProcessor(ProjectProcessor):
             log=True,
             registry=self.registry,
         )
-        self.modules["yolo_utils"].add_data(
+        yolo_utils.add_data(
             str(Path(latest_tracker).parent.absolute()),
             "tracker_output",
             self.registry,
