@@ -52,9 +52,6 @@ class ProjectProcessor:
         self.species_of_interest = []
         self.selected_movies_id = {}
 
-        # Import modules
-        self.modules = g_utils.import_modules([])
-
         # Get server details and connect to server
         self.connect_to_server()
 
@@ -1356,8 +1353,7 @@ class MLProjectProcessor(ProjectProcessor):
         # Replace cv2.VideoWriter with the patched version
         cv2.VideoWriter = CustomVideoWriter
 
-        self.modules = g_utils.import_modules([])
-        self.modules.update(g_utils.import_modules(["yolo_utils"], utils=True))
+        self.modules = g_utils.import_modules(["yolo_utils"], utils=True)
         self.modules.update(
             g_utils.import_modules(
                 ["torch", "wandb", "yaml", "ultralytics"],
@@ -2603,8 +2599,7 @@ class Annotator:
         self.images_path = images_path
         self.potential_labels = potential_labels
         self.bboxes = {}
-        self.modules = g_utils.import_modules([])
-        self.modules.update(g_utils.import_modules(["fiftyone"], utils=False))
+        self.modules = g_utils.import_modules(["fiftyone"], utils=False)
 
     def __repr__(self):
         return repr(self.__dict__)
