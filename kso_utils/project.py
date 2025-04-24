@@ -47,13 +47,13 @@ class ProjectProcessor:
         self.selected_movies_id = {}
 
         # Get server details and connect to server
-        self.connect_to_server()
+        self._connect_to_server()
 
         # Map initial csv files
-        self.map_init_csv()
+        self._map_init_csv()
 
         # Create empty db and populate with local csv files data
-        self.setup_db()
+        self._setup_db()
 
     def __repr__(self):
         return f"ProjectProcessor(project={self.project})"
@@ -68,7 +68,7 @@ class ProjectProcessor:
     # Functions to initiate the project
     #############
 
-    def connect_to_server(self):
+    def _connect_to_server(self):
         """
         It connects to the server and returns the server info
         :return: The server_connection is added to the ProjectProcessor class.
@@ -78,7 +78,7 @@ class ProjectProcessor:
         except Exception as e:
             logging.error(f"Server connection could not be established. Details: {e}")
 
-    def map_init_csv(self):
+    def _map_init_csv(self):
         """
         This function maps the csv files, download them from the server (if needed) and
         stores the server/local paths of the csv files
@@ -99,9 +99,9 @@ class ProjectProcessor:
         )
 
         # Store the paths of the local csv files
-        self.load_meta()
+        self._load_meta()
 
-    def load_meta(self):
+    def _load_meta(self):
         """
         It loads the metadata from the relevant local csv files into the `csv_paths` dictionary
         """
@@ -128,7 +128,7 @@ class ProjectProcessor:
                     if csv_key == "local_sites_csv":
                         self.local_sites_csv = df
 
-    def setup_db(self):
+    def _setup_db(self):
         """
         The function creates a database and populates it with the data from the local csv files.
         It also return the db connection
@@ -1961,7 +1961,7 @@ class MLProjectProcessor(ProjectProcessor):
         logging.info("Run succeeded, finishing run...")
         self.modules["wandb"].finish()
 
-    def process_results(self, src, results):
+    def _process_results(self, src, results):
         fc = 0
         if Path(src).is_dir():
             obj = [f for f in Path(src).iterdir() if f.is_file()]
@@ -2049,7 +2049,7 @@ class MLProjectProcessor(ProjectProcessor):
                         stream=True,
                         verbose=False,
                     )
-                    self.process_results(src, results)
+                    self._process_results(src, results)
 
             else:
                 results = model.predict(
@@ -2064,7 +2064,7 @@ class MLProjectProcessor(ProjectProcessor):
                     stream=True,
                     verbose=False,
                 )
-                self.process_results(source, results)
+                self._process_results(source, results)
         else:
             logging.error(
                 "We do not currently support running YoloV5 models. Please re-train models "
@@ -2094,9 +2094,9 @@ class MLProjectProcessor(ProjectProcessor):
             #         name=name,
             #         nosave=not save_output,
             #     )
-        self.save_detections(conf_thres, model.ckpt_path, self.eval_dir, out_format)
+        self._save_detections(conf_thres, model.ckpt_path, self.eval_dir, out_format)
 
-    def save_detections(
+    def _save_detections(
         self, conf_thres: float, model: str, eval_dir: str, out_format: str = "yolo"
     ):
         if self.registry == "wandb":
@@ -2257,7 +2257,7 @@ class MLProjectProcessor(ProjectProcessor):
         return latest_tracker
         # self.modules["wandb"].finish()
 
-    def increment_path(self, path, exist_ok=False, sep="", mkdir=False):
+    def _increment_path(self, path, exist_ok=False, sep="", mkdir=False):
         # Increment file or directory path, i.e. runs/exp --> runs/exp{sep}2, runs/exp{sep}3, ... etc.
         path = Path(path)  # os-agnostic
         if path.exists() and not exist_ok:
@@ -2293,7 +2293,7 @@ class MLProjectProcessor(ProjectProcessor):
     ):
         if not hasattr(self, "eval_dir"):
             self.eval_dir = str(
-                self.increment_path(path=Path(self.save_dir) / "detect", exist_ok=False)
+                self._increment_path(path=Path(self.save_dir) / "detect", exist_ok=False)
             )
 
         latest_tracker = yolo_utils.track_objects(
