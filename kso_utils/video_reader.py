@@ -8,7 +8,6 @@ from typing import Tuple, Iterator
 
 import av
 import cv2
-from more_itertools import first
 import numpy as np
 import sys
 
@@ -52,9 +51,9 @@ class CacheDict(Generic[KeyType, ItemType]):
 
     def _remove_oldest_item(self):
         if len(self._buffer) > 0:
-            first_key = first(self._buffer.keys())
+            first_key = self._buffer.keys()[0]
             value, itemsize = self._buffer[first_key]
-            del self._buffer[first(self._buffer.keys())]
+            del self._buffer[first_key]
             if itemsize is not None:
                 self._current_buffer_size -= itemsize
 
