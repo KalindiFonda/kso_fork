@@ -49,18 +49,6 @@ def wait_for_change(widget1: widgets.Widget, widget2: widgets.Widget):
     widget2.on_click(getvalue)
     return future
 
-
-def single_wait_for_change(widget, value):
-    future = asyncio.Future()
-
-    def getvalue(change):
-        future.set_result(change.new)
-        widget.unobserve(getvalue, value)
-
-    widget.observe(getvalue, value)
-    return future
-
-
 ######################################
 # ###### Common widgets ###########
 # #####################################
@@ -197,7 +185,7 @@ def gpu_select():
 
 
 # Select the movie(s) you want
-def select_movie(available_movies_df: pd.DataFrame):
+def _select_movie(available_movies_df: pd.DataFrame):
     """
     > This function takes in a dataframe of available movies and returns a widget that allows the user
     to select movie(s) of interest
@@ -275,7 +263,7 @@ def choose_footage(
         # movie_output = widgets.Output()
 
         # Display the available movies
-        select_movie_widg = select_movie(df)
+        select_movie_widg = _select_movie(df)
 
         def update_movie(change):
             selected_movies = change["new"]
@@ -310,7 +298,7 @@ def choose_footage(
                         [movie_row.values], columns=movie_row.index
                     )
 
-                    html = preview_movie(
+                    html = _preview_movie(
                         movie_path=movie_path,
                         movie_metadata=movie_metadata,
                     )
@@ -410,7 +398,7 @@ def choose_aggregation_users(info_dict: dict):
 
     def get_users_list(info_dict: dict, option: str):
         if "specific" in option:
-            users = select_users(info_dict)
+            users = _select_users(info_dict)
             return users
         else:
             clear_output()
@@ -435,7 +423,7 @@ def choose_aggregation_users(info_dict: dict):
     return users
 
 
-def select_users(info_dict: dict):
+def _select_users(info_dict: dict):
     """
     Returns a widget showing all the citizen scientits that made classifications in the project,
     sorted in descending order according to the number of classifications they have made.
@@ -604,7 +592,7 @@ def choose_agg_parameters(subject_type: str = "clip"):
         return agg_users, min_users
 
 
-def choose_w_version(workflows_df: pd.DataFrame, workflow_id: str):
+def _choose_w_version(workflows_df: pd.DataFrame, workflow_id: str):
     """
     It takes a workflow ID and returns a dropdown widget with the available versions of the workflow
 
@@ -675,13 +663,13 @@ def choose_workflows(workflows_df: pd.DataFrame):
         layout=layout,
     )
 
-    workflow_version, versions = choose_w_version(workflows_df, workflow_name.value)
+    workflow_version, versions = _choose_w_version(workflows_df, workflow_name.value)
 
     def on_change(change):
         with out:
             if change["name"] == "value":
                 clear_output()
-                workflow_version.options = choose_w_version(
+                workflow_version.options = _choose_w_version(
                     workflows_df, change["new"]
                 )[1]
                 workflow_name.observe(on_change)
@@ -852,7 +840,7 @@ def display_ipysheet_changes(isheet: ipysheet.Sheet, df_filtered: pd.DataFrame):
 
 
 # Function to preview underwater movies
-def preview_movie(
+def _preview_movie(
     movie_path: str,
     movie_metadata: pd.DataFrame,
 ):
@@ -935,7 +923,7 @@ def choose_movie_review():
     return choose_movie_review_widget
 
 
-def log_meta_changes(
+def _log_meta_changes(
     project: Project,
     meta_key: str,
     new_sheet_df: pd.DataFrame,
@@ -1049,7 +1037,7 @@ def update_meta(
             )
 
             # Log changes locally
-            log_meta_changes(
+            _log_meta_changes(
                 project=project,
                 meta_key="local_" + meta_name + "_csv",
                 new_sheet_df=sheet_df,
@@ -1121,68 +1109,12 @@ def open_csv(
 
 
 ######################################
-# ###### Tut 2 widgets ###########
-# #####################################
-
-
-def choose_new_videos_to_upload():
-    """
-    Simple widget for uploading videos from a file browser.
-    returns the list of movies to be added.
-    Supports multi-select file uploads
-    """
-
-    movie_list = []
-
-    fc = FileChooser()
-    fc.title = "First choose your directory of interest and then the movies you would like to upload"
-    print("Choose the file that you want to upload: ")
-
-    def change_dir(chooser):
-        sel.options = [
-            str(Path(chooser.selected, item)) for item in os.listdir(chooser.selected)
-        ]
-        fc.children[1].children[2].layout.display = "none"
-        sel.layout.visibility = "visible"
-
-    fc.register_callback(change_dir)
-
-    sel = widgets.SelectMultiple(options=[])
-
-    display(fc)
-    display(sel)
-
-    sel.layout.visibility = "hidden"
-
-    button_add = widgets.Button(description="Add selected file")
-    output_add = widgets.Output()
-
-    print("Showing paths to the selected movies:\nRerun cell to reset\n--------------")
-
-    display(button_add, output_add)
-
-    def on_button_add_clicked(b):
-        with output_add:
-            if sel.value is not None:
-                for movie in sel.value:
-                    if Path(movie).suffix in [".mp4", ".mov"]:
-                        movie_list.append([Path(movie), movie])
-                        print(Path(movie))
-                    else:
-                        print("Invalid file extension")
-                    fc.reset()
-
-    button_add.on_click(on_button_add_clicked)
-    return movie_list
-
-
-######################################
 # ###### Tut 3 widgets ###########
 # #####################################
 
 
 # Display the number of clips to generate based on the user's selection
-def to_clips(clip_length, clips_range, is_example: bool):
+def _to_clips(clip_length, clips_range, is_example: bool):
     # Calculate the number of clips to generate
     clips = int((clips_range[1] - clips_range[0]) / clip_length)
 
@@ -1224,9 +1156,9 @@ def select_n_clips(
     example_widget = widgets.Checkbox(value=is_example, description="Random examples")
     example_widget.layout.visibility = "hidden"
     clip_length_number = widgets.interactive(
-        to_clips,
+        _to_clips,
         is_example=example_widget,
-        clip_length=select_clip_length(),
+        clip_length=_select_clip_length(),
         clips_range=widgets.IntRangeSlider(
             value=[movie_df.sampling_start.values, movie_df.sampling_end.values],
             min=0,
@@ -1241,7 +1173,7 @@ def select_n_clips(
     return clip_length_number
 
 
-def select_clip_length():
+def _select_clip_length():
     """
     > This function creates a dropdown widget that allows the user to select the length of the clips
     :return: The widget is being returned.
@@ -1287,7 +1219,7 @@ class clip_modification_widget(widgets.VBox):
         num_bools = widg["new"]
         new_widgets = []
         for _ in range(num_bools):
-            new_widget = select_modification()
+            new_widget = _select_modification()
             for wdgt in [new_widget]:
                 wdgt.description = wdgt.description + f" #{_}"
             new_widgets.extend([new_widget])
@@ -1299,7 +1231,7 @@ class clip_modification_widget(widgets.VBox):
 
 
 # Function to specify the frame modification
-def select_modification():
+def _select_modification():
 
     # Widget to select the frame modification
 
@@ -1362,7 +1294,7 @@ def select_modification():
 
 
 # Display the clips side-by-side
-def view_clips(example_clips: list, modified_clips: list, modified_clip_selected: str):
+def _view_clips(example_clips: list, modified_clips: list, modified_clip_selected: str):
     """
     > This function takes in a list of example clips and a path to a modified clip, and returns a widget
     that displays the original and modified clips side-by-side
@@ -1425,7 +1357,7 @@ def compare_clips(example_clips: list, modified_clips: list):
             if change["new"] == "0 No movie":
                 logging.info("It is OK to modify the clips again")
             else:
-                a = view_clips(example_clips, modified_clips, change["new"])
+                a = _view_clips(example_clips, modified_clips, change["new"])
                 display(a)
 
     clip_path_widget.observe(on_change, names="value")
@@ -1556,7 +1488,7 @@ def extract_custom_frames(
 
 
 # Display the frames using html
-def view_frames(df: pd.DataFrame, frame_path: str):
+def _view_frames(df: pd.DataFrame, frame_path: str):
     # Get path of the modified clip selected
     modified_frame_path = df[df["frame_path"] == frame_path].modif_frame_path.values[0]
     extension = os.path.splitext(frame_path)[1]
@@ -1601,7 +1533,7 @@ def compare_frames(df):
             if change["new"] == "No frame":
                 logging.info("It is OK to modify the frames again")
             else:
-                a = view_frames(df, change["new"])
+                a = _view_frames(df, change["new"])
                 display(a)
 
     clip_path_widget.observe(on_change, names="value")
@@ -1981,7 +1913,7 @@ def format_to_gbif(
 # #####################################
 
 
-def view_subject(subject_id: int, class_df: pd.DataFrame, subject_type: str):
+def _view_subject(subject_id: int, class_df: pd.DataFrame, subject_type: str):
     """
     It takes a subject id, a dataframe containing the annotations for that subject, and the type of
     subject (clip or frame) and returns an HTML object that can be displayed in a notebook
@@ -2137,7 +2069,7 @@ def launch_classifications_viewer(class_df: pd.DataFrame, subject_type: str):
     # Display the subject and classifications on change
     def on_change(change):
         with main_out:
-            a = view_subject(int(change["new"]), class_df, subject_type)
+            a = _view_subject(int(change["new"]), class_df, subject_type)
             clear_output()
             display(a)
 
@@ -2253,16 +2185,6 @@ def choose_eval_params():
     display(z1)
     return z1
 
-
-def choose_viewer(viewer):
-    if viewer == "image":
-        image_viewer()
-    elif viewer == "video":
-        movie_viewer()
-    else:
-        logging.error("Invalid option selected.")
-
-
 def select_viewer():
     viewer_dropdown = widgets.Dropdown(
         options=["image", "video"],
@@ -2276,7 +2198,12 @@ def select_viewer():
     def on_change(change):
         with output:
             output.clear_output()
-            choose_viewer(change.new)
+            if change.new == "image":
+                _image_viewer()
+            elif change.new == "video":
+                _movie_viewer()
+            else:
+                logging.error("Invalid option selected.")
 
     viewer_dropdown.observe(on_change, names="value")
 
@@ -2284,7 +2211,7 @@ def select_viewer():
     display(output)
 
 
-def image_viewer():
+def _image_viewer():
     def check_image(change):
         filepath = file_chooser.selected
         if filepath.lower().endswith((".jpg", ".jpeg")):
@@ -2312,7 +2239,7 @@ def image_viewer():
     display(file_chooser_widget)
 
 
-def movie_viewer():
+def _movie_viewer():
     def check_movie(change):
         filepath = file_chooser.selected
         if filepath.endswith(".mp4"):
