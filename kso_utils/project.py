@@ -164,54 +164,6 @@ class ProjectProcessor:
     #############
     # t1
     #############
-    def select_meta_range(self, meta_key: str):
-        """
-        > This function takes a meta key as input and returns a dataframe, range of rows, and range of
-        columns
-
-        :param meta_key: str
-        :type meta_key: str
-        :return: meta_df, range_rows, range_columns
-        """
-        meta_df, range_rows, range_columns = kso_widgets.select_sheet_range(
-            project=self.project,
-            orig_csv=f"local_{meta_key}_csv",
-            csv_paths=self.csv_paths,
-        )
-        return meta_df, range_rows, range_columns
-
-    def view_meta_changes(self, df_filtered, sheet):
-        """
-        > This function takes a dataframe and a sheet name as input, and returns a dataframe with the
-        changes highlighted
-
-        :param df_filtered: a dataframe that has been filtered by the user
-        :param sheet: the name of the sheet you want to view
-        :return: A dataframe with the changes highlighted.
-        """
-        highlight_changes, sheet_df = kso_widgets.display_ipysheet_changes(
-            isheet=sheet, df_filtered=df_filtered
-        )
-        display(highlight_changes)
-        return sheet_df
-
-    def update_meta(
-        self,
-        sheet_df: pd.DataFrame,
-        meta_name: str,
-        test: bool = False,
-    ):
-        return kso_widgets.update_meta(
-            project=self.project,
-            conn=self.db_connection,
-            server_connection=self.server_connection,
-            sheet_df=sheet_df,
-            df=getattr(self, "local_" + meta_name + "_csv"),
-            meta_name=meta_name,
-            csv_paths=self.csv_paths,
-            test=test,
-        )
-
     def map_sites(self):
         return kso_widgets.map_sites(project=self.project, csv_paths=self.csv_paths)
 
