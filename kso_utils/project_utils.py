@@ -30,10 +30,7 @@ class Project:
     utils_path: str = None
 
 
-def find_project(project_name: str = ""):
-    """Find project information using
-    project csv path and project name"""
-
+def get_cdn_user():
     # The code below makes sure to use the cloudina project file when working on Cloudina
     full_username = os.environ.get("USER")
     # Check if the username starts with 'jupyter-' and extract the part after it
@@ -44,12 +41,20 @@ def find_project(project_name: str = ""):
             None  # Handle the case where the username does not start with 'jupyter-'
         )
     cdn_user = f"/cache/album/cache/{username}"
+    return cdn_user
+
+
+def get_projects_csv_file():
+    cdn_user = get_cdn_user()
     if Path(cdn_user, "bucket").exists():
         # If this path exists, we are on cloudina and use the cloudina csv
         project_csv = "kso_utils/db_starter/cdn_projects_list.csv"
     else:
         # We are not on cloudina, so use the normal csv
-        project_csv = "kso_utils/db_starter/projects_list.csv"
+        # Get the directory of this utils file
+        base_dir = Path(__file__).resolve().parent
+        # Build path to the data file
+        project_csv = base_dir / "db_starter" / "projects_list.csv"
 
     # Check if the csv exists, otherwise retrieve it from github
     if not Path(project_csv).exists():
@@ -68,6 +73,13 @@ def find_project(project_name: str = ""):
         raise FileNotFoundError(
             f"The CSV {project_csv} does not exist and could not be retrieved from Gitlab."
         )
+    return project_csv
+
+
+def find_project(project_name: str = ""):
+    """Find project information using project csv path and project name"""
+    project_csv = get_projects_csv_file()
+    cdn_user = get_cdn_user()  # is used if on cloudina, otherwise not used
 
     with open(project_csv, mode="r", newline="", encoding="utf-8") as file:
         reader = csv.DictReader(file)  # Reads rows as dictionaries
@@ -91,7 +103,7 @@ def find_project(project_name: str = ""):
                     movie_folder=row.get("movie_folder"),
                     photo_folder=row.get("photo_folder"),
                     ml_folder=row.get("ml_folder"),
-                    utils_path=row.get("utils_path")
+                    utils_path=row.get("utils_path"),
                 )
                 return project
 

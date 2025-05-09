@@ -24,7 +24,7 @@ from PIL import Image as PILImage
 
 # util imports
 from kso_utils.video_reader import VideoReader
-from kso_utils.project_utils import Project
+from kso_utils.project_utils import Project, get_projects_csv_file
 import kso_utils.movie_utils as movie_utils
 
 # Logging
@@ -98,9 +98,7 @@ def choose_species(db_connection, species_list=None):
     return w
 
 
-def choose_project(
-    projects_csv: str = "../kso_utils/db_starter/projects_list.csv",
-):
+def choose_project():
     """
     This function generates a dropdown menu with project names listed based on a CSV file.
 
@@ -109,24 +107,8 @@ def choose_project(
     :return: A dropdown widget with the project names as options
     :rtype: ipywidgets.Dropdown
     """
-    projects_csv_path = Path(projects_csv)
-
-    # Check if the specified path exists and it's a CSV file
-    if projects_csv_path.exists() and projects_csv_path.suffix != ".csv":
-        raise ValueError(
-            "The provided file is not a CSV. Please select a valid CSV file."
-        )
-
-    # If the file doesn't exist, try to retrieve it from GitHub
-    if not projects_csv_path.exists():
-        projects_csv_url = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/main/kso_utils/db_starter/projects_list.csv?raw=true"
-        projects_csv_path = Path.cwd() / "projects_list.csv"
-        # Download the CSV file
-        projects_df = pd.read_csv(projects_csv_url)
-        # Save the downloaded CSV file
-        projects_df.to_csv(projects_csv_path, index=False)
-    else:
-        projects_df = pd.read_csv(projects_csv_path)
+    projects_csv_path = get_projects_csv_file()
+    projects_df = pd.read_csv(projects_csv_path)
 
     if "Project_name" not in projects_df.columns:
         raise ValueError("The CSV file does not contain a 'Project_name' column.")
