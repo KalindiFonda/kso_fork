@@ -1405,7 +1405,6 @@ def track_objects(
     conf_thres: float = 0.5,
     img_size: tuple = (720, 540),
     gpu: bool = False,
-    test: bool = False,
 ):
     """
     This function takes in the source directory of the video, the artifact directory, the tracker
@@ -1438,7 +1437,7 @@ def track_objects(
         and "best" in str(f)
     ]
 
-    if len(models) > 0 and not test:
+    if len(models) > 0:
         best_model = models[0]
     else:
         logging.info("No trained model found, using yolov8 base model...")

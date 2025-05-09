@@ -256,7 +256,6 @@ def choose_footage(
     server_connection: dict,
     footage_source: str,
     preview_media: bool,
-    test: bool,
 ):
     """
     > The function `choose_footage` is a function that takes in a `self` argument and returns a
@@ -268,7 +267,6 @@ def choose_footage(
     :param server_connection: a dictionary with the connection to the server
     :param footage_source: a string specifying whether the footage is already in the system or is new
     :param preview_media: a boolean parameter to display or not the movie selected
-    :param test: a boolean parameter to specify if running the test scripts
 
     """
 
@@ -280,10 +278,7 @@ def choose_footage(
         select_movie_widg = select_movie(df)
 
         def update_movie(change):
-            if test:
-                selected_movies = [change["new"]]
-            else:
-                selected_movies = change["new"]
+            selected_movies = change["new"]
 
             # Get the df and paths of the selected movies
             (
@@ -327,11 +322,6 @@ def choose_footage(
         # Observe changes in the widget
         select_movie_widg.observe(update_movie, "value")
         display(select_movie_widg)
-
-        if test:
-            # For the test case, directly call the update_movie logic
-            select_movie_widg.options = (select_movie_widg.options[0],)
-            update_movie({"new": select_movie_widg.options[0]})
 
     elif footage_source == "New Footage":
 

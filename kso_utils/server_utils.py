@@ -138,7 +138,7 @@ def download_init_csv(project: Project, init_keys: list, server_connection: dict
     return db_initial_info
 
 
-def get_ml_data(project: Project, test: bool = False):
+def get_ml_data(project: Project):
     """
     It downloads the training data from Google Drive.
     Currently only applies to the Template Project as other projects do not have prepared
@@ -154,10 +154,7 @@ def get_ml_data(project: Project, test: bool = False):
             ml_folder = project.ml_folder
 
             # Download template training files from Gdrive
-            if test:
-                download_gdrive(gdrive_id, Path("../test/test_output") / ml_folder)
-            else:
-                download_gdrive(gdrive_id, Path(ml_folder))
+            download_gdrive(gdrive_id, Path(ml_folder))
             logging.info("Template data downloaded successfully")
         else:
             logging.info("No download method implemented for this data")
