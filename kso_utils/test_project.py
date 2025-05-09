@@ -28,3 +28,7 @@ def test_init_ProjectProcessor():
         pp.csv_paths == template_csv_paths
     ), f"The self.csv_paths are not set correctly in _load_meta. They should be {template_csv_paths}, but got {pp.csv_paths}."
     # Also pp.local_sites_csv is set and this is the sites df itself, but I don't know what to test for that.
+
+
+def test_init_MLProjectProcessor():
+    mlp = p.MLProjectProcessor(template)
