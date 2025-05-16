@@ -27,16 +27,18 @@ def empty_table(conn: sqlite3.Connection, table_name: str):
     cursor = conn.cursor()
     try:
         cursor.execute(f"DELETE FROM {table_name}")
-        logging.info(f"Previous content from the '{table_name}' table have been cleared.")
-        conn.commit() # Commit your changes in the database
+        logging.info(
+            f"Previous content from the '{table_name}' table have been cleared."
+        )
+        conn.commit()  # Commit your changes in the database
     except sqlite3.Error:
         cursor.execute("PRAGMA table_list;")
-        raise sqlite3.Error(f"Table '{table_name}' does not exist, only tables {[row[1] for row in cursor.fetchall()]}")
+        raise sqlite3.Error(
+            f"Table '{table_name}' does not exist, only tables {[row[1] for row in cursor.fetchall()]}"
+        )
 
 
-def add_to_table(
-    conn: sqlite3.Connection, table_name: str, values: list
-):
+def add_to_table(conn: sqlite3.Connection, table_name: str, values: list):
     """
     This function adds multiple rows of data to a specified table in a SQLite database.
 
@@ -52,7 +54,8 @@ def add_to_table(
     try:
         cur = conn.cursor()
         cur.executemany(
-            f"INSERT INTO {table_name} VALUES ({', '.join(['?' for _ in values[0]])})", values
+            f"INSERT INTO {table_name} VALUES ({', '.join(['?' for _ in values[0]])})",
+            values,
         )
         conn.commit()
 
@@ -67,7 +70,9 @@ def add_to_table(
 
             # Save the problematic value
             foreign_key_value = values[value_i]
-            raise sqlite3.DataError(f"Foreign Key Constraint Error (table: {table_name}), Error values: {foreign_key_value}, Full Error: {e} ")
+            raise sqlite3.DataError(
+                f"Foreign Key Constraint Error (table: {table_name}), Error values: {foreign_key_value}, Full Error: {e} "
+            )
         else:
             raise sqlite3.Error(f"add_to_table failed: {e}")
 
@@ -88,7 +93,10 @@ def test_table_for_none(df: pd.DataFrame, table_name: str, keys: list = ["id"]):
     values in these key columns, which would indicate that some rows were not properly matched
     :type keys: list
     """
-    assert len(df[df[keys].isnull().any(axis=1)]) == 0, f"The table {table_name} has invalid entries, please ensure that all columns are non-zero. The invalid entries are {df[df[keys].isnull().any(axis=1)]}"
+    assert (
+        len(df[df[keys].isnull().any(axis=1)]) == 0
+    ), f"The table {table_name} has invalid entries, please ensure that all columns are non-zero. The invalid entries are {df[df[keys].isnull().any(axis=1)]}"
+
 
 def get_df_from_db_table(conn: sqlite3.Connection, table_name: str):
     """
@@ -177,26 +185,32 @@ def cols_rename_to_schema(
         mod = import_module(project.utils_path)
         func_get_col_names = getattr(mod, "get_col_names")
         col_names_lookup = func_get_col_names(table_name)
-        logging.info(f"{project.Project_name} has colums to rename, these are successfully retrieved.") 
+        logging.info(
+            f"{project.Project_name} has colums to rename, these are successfully retrieved."
+        )
     except ModuleNotFoundError as e:
         if e.name == project.utils_path:
-            logging.info(f"{project.Project_name} does not define a utils module for renaming. Skipping renaming.")
+            logging.info(
+                f"{project.Project_name} does not define a utils module for renaming. Skipping renaming."
+            )
             return df
         else:
             raise  # re-raise unexpected import errors
     except AttributeError as e:
-        logging.info(f"{project.Project_name} does not define a 'get_col_names' function. Skipping renaming.")
+        logging.info(
+            f"{project.Project_name} does not define a 'get_col_names' function. Skipping renaming."
+        )
         return df
-    
+
     if not isinstance(col_names_lookup, dict):
-        raise TypeError(f"The get_col_names function needs to return a dict, got a {type(col_names_lookup)}")
-    
+        raise TypeError(
+            f"The get_col_names function needs to return a dict, got a {type(col_names_lookup)}"
+        )
+
     # Actually rename the columns
     if reverse_lookup:
         # Reverse the dictionaries if formatting from schema to csv
-        col_names_lookup = dict(
-            zip(col_names_lookup.values(), col_names_lookup.keys())
-        )
+        col_names_lookup = dict(zip(col_names_lookup.values(), col_names_lookup.keys()))
     df = df.rename(columns=col_names_lookup)
     logging.info("The columns are successfully renamed.")
     return df
@@ -293,27 +307,40 @@ def process_test_csv(
     )
 
     # Map the init_key to the table_id from the csv
-    table_id = {"sites":"site_id", "movies":"movie_id","species":"species_id", "photos":"ID"}
-    assert init_key in table_id.keys(), f"init_key should be one of {table_id.keys()} so that the db has a table for it, but instead got {init_key}"
+    table_id = {
+        "sites": "site_id",
+        "movies": "movie_id",
+        "species": "species_id",
+        "photos": "ID",
+    }
+    assert (
+        init_key in table_id.keys()
+    ), f"init_key should be one of {table_id.keys()} so that the db has a table for it, but instead got {init_key}"
 
     # For Spyfish_Aotearoa: Select only movies that are a good deployment / have good visibility
     if init_key == "movies":
         if project.Project_name in ["Spyfish_Aotearoa"]:
-            assert "IsBadDeployment" in local_df, "The movies csv from Spyfish_Aotearoa expects to have a column called IsBadDeployment, but it is missing."
+            assert (
+                "IsBadDeployment" in local_df
+            ), "The movies csv from Spyfish_Aotearoa expects to have a column called IsBadDeployment, but it is missing."
             # Check for missing values in IsBadDeployment column
             if local_df["IsBadDeployment"].isnull().any():
                 raise ValueError(
                     "The 'IsBadDeployment' column contains missing values. Please handle missing values before proceeding."
                 )
             else:
-                local_df = local_df.loc[~local_df.IsBadDeployment].drop("IsBadDeployment", axis=1)
+                local_df = local_df.loc[~local_df.IsBadDeployment].drop(
+                    "IsBadDeployment", axis=1
+                )
 
     # Rename id columns to simply "id"
-    local_df = local_df.rename(columns={table_id[init_key]:"id"})
+    local_df = local_df.rename(columns={table_id[init_key]: "id"})
 
     # Ensure cols of df match db schema
     schema_col_names = get_column_names_db(conn, init_key).values()
-    assert set(local_df.columns) == set(schema_col_names), f"csv columns and db table columns for {init_key} do not match. The df contains {local_df.columns} and the sql table requires {schema_col_names}. Make sure they contain the same columns."
+    assert set(local_df.columns) == set(
+        schema_col_names
+    ), f"csv columns and db table columns for {init_key} do not match. The df contains {local_df.columns} and the sql table requires {schema_col_names}. Make sure they contain the same columns."
 
     # Roadblock to prevent empty rows in id_columns
     test_table_for_none(local_df, init_key, [local_df.columns[0]])
@@ -323,24 +350,6 @@ def process_test_csv(
     local_df = local_df[[c for c in schema_col_names]]
 
     return local_df
-
-
-def check_basic_meta(
-    meta_key: str, meta_path: str, conn: sqlite3.Connection, keys: list = []
-):
-    # Load the csv with movies information
-    test_df = pd.read_csv(meta_path)
-    # Retrieve the names of the basic columns in the sql db
-    field_names = list(get_column_names_db(conn, meta_key).values())
-    # Select the basic fields for the db check
-    df_to_db = test_df[[c for c in test_df.columns if c in field_names]]
-    # Double-check to prevent missing key information
-    if len(keys) == 0:
-        test_table_for_none(df_to_db, meta_key, df_to_db.columns)
-    else:
-        test_table_for_none(df_to_db, meta_key, keys)
-
-    logging.info(f"The {meta_key} dataframe is complete")
 
 
 def check_species_meta(csv_paths: dict, conn: sqlite3.Connection):
