@@ -12,7 +12,6 @@ import gdown
 import datetime
 import ffmpeg
 import shutil
-import sqlite3
 from tqdm import tqdm
 from panoptes_client import Panoptes, panoptes, Subject, SubjectSet
 from panoptes_client import Project as zooProject
@@ -34,21 +33,10 @@ import ipywidgets as widgets
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
+
 ##########################
 # General Zoo purpose functions
 ##########################
-
-
-def zoo_credentials():
-    zoo_user = getpass.getpass("Enter your Zooniverse user")
-    zoo_pass = getpass.getpass("Enter your Zooniverse password")
-    return zoo_user, zoo_pass
-
-
-class AuthenticationError(Exception):
-    pass
-
-
 def connect_zoo_project(project: Project, zoo_cred=False):
     """
     It takes a project name as input, and returns a Zooniverse project object
@@ -60,7 +48,8 @@ def connect_zoo_project(project: Project, zoo_cred=False):
     """
     if zoo_cred is False:
         # Save your Zooniverse user name and password.
-        zoo_user, zoo_pass = zoo_credentials()
+        zoo_user = getpass.getpass("Enter your Zooniverse user")
+        zoo_pass = getpass.getpass("Enter your Zooniverse password")
     else:
         zoo_user = zoo_cred[0]
         zoo_pass = zoo_cred[1]
@@ -69,7 +58,7 @@ def connect_zoo_project(project: Project, zoo_cred=False):
     project_n = project.Zooniverse_number
 
     # Connect to the Zooniverse project
-    zoo_project = auth_session(zoo_user, zoo_pass, project_n)
+    zoo_project = _auth_session(zoo_user, zoo_pass, project_n)
 
     logging.info("Connected to Zooniverse")
 
@@ -77,7 +66,7 @@ def connect_zoo_project(project: Project, zoo_cred=False):
 
 
 # Function to authenticate to Zooniverse
-def auth_session(username: str, password: str, project_n: int):
+def _auth_session(username: str, password: str, project_n: int):
     """
     It connects to the Zooniverse with your username and password, and then returns the project number
     you specify
@@ -422,14 +411,14 @@ def process_zoo_classifications(
         subjects_df["subject_id"].isin(unique_subject_ids)
     ].copy()
 
-    from kso_utils.db_utils import drop_table
+    from kso_utils.db_utils import empty_table
 
     # Safely remove subjects table
-    drop_table(conn=db_connection, table_name="subjects")
+    empty_table(conn=db_connection, table_name="subjects")
 
     if len(subjects_series) > 0:
         # Fill or re-fill subjects table
-        populate_subjects(project, server_connection, db_connection, subjects_series)
+        _populate_subjects(project, server_connection, db_connection, subjects_series)
     else:
         logging.error("No subjects to populate database from the workflows selected.")
 
@@ -474,7 +463,7 @@ def process_zoo_classifications(
 
             # Process clips as the default method
             else:
-                rows_list = process_clips_default(
+                rows_list = _process_clips_default(
                     annotations, row["classification_id"], rows_list
                 )
 
@@ -608,7 +597,7 @@ def process_zoo_classifications(
     return pd.DataFrame(annot_df)
 
 
-def process_clips_default(annotations: pd.DataFrame, row_class_id, rows_list: list):
+def _process_clips_default(annotations: pd.DataFrame, row_class_id, rows_list: list):
     """
     For each annotation, if the task is T0, then for each species annotated, flatten the relevant
     answers and save the species of choice, class and subject id.
@@ -707,7 +696,7 @@ def aggregate_classifications(
         )
 
         # Aggregate frames based on volunteer consensus of the labels
-        agg_labels_df = aggregate_labels(
+        agg_labels_df = _aggregate_labels(
             processed_classifications, agg_users, min_users
         )
 
@@ -829,7 +818,9 @@ def aggregate_classifications(
             agg_users, min_users = agg_params
 
         # Aggregate clips based on their labels
-        agg_class_df = aggregate_labels(processed_classifications, agg_users, min_users)
+        agg_class_df = _aggregate_labels(
+            processed_classifications, agg_users, min_users
+        )
 
     # Drop unnecessary columns
     agg_class_df = agg_class_df.drop(columns=["classification_id", "user_name"])
@@ -847,7 +838,7 @@ def aggregate_classifications(
     return agg_class_df
 
 
-def aggregate_labels(
+def _aggregate_labels(
     processed_classifications: pd.DataFrame, agg_users: float, min_users: int
 ):
     """
@@ -965,129 +956,7 @@ def launch_classifications_table(agg_class_df: pd.DataFrame, subject_type: str):
 ##########################
 
 
-def get_workflow_ids(workflows_df: pd.DataFrame, workflow_names: list):
-    # The function that takes a list of workflow names and returns a list of workflow
-    # ids.
-    return [
-        workflows_df[workflows_df.display_name == wf_name].workflow_id.unique()[0]
-        for wf_name in workflow_names
-    ]
-
-
-def get_classifications(
-    project: Project,
-    conn: sqlite3.Connection,
-    workflow_dict: dict,
-    workflows_df: pd.DataFrame,
-    subj_type: str,
-    class_df: pd.DataFrame,
-):
-    """
-    It takes in a dictionary of workflows, a dataframe of workflows, the type of subject (frame or
-    clip), a dataframe of classifications, the path to the database, and the project name. It returns a
-    dataframe of classifications
-
-    :param project: the project object
-    :param conn: SQL connection object
-    :param workflow_dict: a dictionary of the workflows you want to retrieve classifications for. The
-        keys are the workflow names, and the values are the workflow IDs, workflow versions, and the minimum
-        number of classifications per subject
-    :type workflow_dict: dict
-    :param workflows_df: the dataframe of workflows from the Zooniverse project
-    :type workflows_df: pd.DataFrame
-    :param subj_type: "frame" or "clip"
-    :param class_df: the dataframe of classifications from the database
-    :return: A dataframe with the classifications for the specified project and workflow.
-    """
-
-    names, workflow_versions = [], []
-    for i in range(0, len(workflow_dict), 3):
-        names.append(list(workflow_dict.values())[i])
-        workflow_versions.append(list(workflow_dict.values())[i + 2])
-
-    workflow_ids = get_workflow_ids(workflows_df, names)
-
-    # Filter classifications of interest
-    classes = []
-    for id, version in zip(workflow_ids, workflow_versions):
-        class_df_id = class_df[
-            (class_df.workflow_id == id) & (class_df.workflow_version >= version)
-        ].reset_index(drop=True)
-        classes.append(class_df_id)
-    classes_df = pd.concat(classes)
-
-    # Add information about the subject
-    # Query id and subject type from the subjects table
-    subjects_df = db_utils.get_df_from_db_table(conn, "subjects")
-
-    if subj_type == "frame":
-        # Select only frame subjects
-        subjects_df = subjects_df[subjects_df["subject_type"] == "frame"]
-
-        # Select columns relevant for frame subjects
-        subjects_df = subjects_df[
-            [
-                "id",
-                "subject_type",
-                "https_location",
-                "filename",
-                "frame_number",
-                "movie_id",
-            ]
-        ]
-
-    else:
-        # Select only clip subjects
-        subjects_df = subjects_df[subjects_df["subject_type"] == "clip"]
-
-        # Select columns relevant for clip subjects
-        subjects_df = subjects_df[
-            [
-                "id",
-                "subject_type",
-                "https_location",
-                "filename",
-                "clip_start_time",
-                "movie_id",
-            ]
-        ]
-
-    # Ensure id format matches classification's subject_id
-    classes_df["subject_ids"] = classes_df["subject_ids"].astype("Int64")
-    subjects_df["id"] = subjects_df["id"].astype("Int64")
-
-    # Add subject information based on subject_ids
-    classes_df = pd.merge(
-        classes_df,
-        subjects_df,
-        how="left",
-        left_on="subject_ids",
-        right_on="id",
-    )
-
-    if classes_df[["subject_type", "https_location"]].isna().any().any():
-        # Exclude classifications from missing subjects
-        filtered_class_df = classes_df.dropna(
-            subset=["subject_type", "https_location"], how="any"
-        ).reset_index(drop=True)
-
-        # Report on the issue
-        logging.info(
-            f"There are {(classes_df.shape[0]-filtered_class_df.shape[0])}"
-            f" classifications out of {classes_df.shape[0]}"
-            f" missing subject info. Maybe the subjects have been removed from Zooniverse?"
-        )
-
-        classes_df = filtered_class_df
-
-    logging.info(
-        f"{classes_df.shape[0]} Zooniverse classifications have been retrieved"
-    )
-
-    return classes_df
-
-
-def populate_subjects(
+def _populate_subjects(
     project: Project,
     server_connection: dict,
     db_connection,
@@ -1293,17 +1162,20 @@ def populate_subjects(
     # Set the subject columns in the right order
     subjects = subjects[required_cols]
 
-    from kso_utils.db_utils import test_table, add_to_table, get_df_from_db_table
+    from kso_utils.db_utils import (
+        test_table_for_none,
+        add_to_table,
+        get_df_from_db_table,
+    )
 
     # Test table validity
-    test_table(subjects, "subjects", keys=["id"])
+    test_table_for_none(subjects, "subjects", keys=["id"])
 
     # Add values to subjects
     add_to_table(
         conn=db_connection,
         table_name="subjects",
         values=[tuple(i) for i in subjects.values],
-        num_fields=11,
     )
 
     # log how many subjects are in the db
@@ -1364,7 +1236,7 @@ def check_movies_uploaded_zoo(project: Project, db_connection, selected_movies: 
 
 
 # Function to extract the videos
-def extract_clips(
+def _extract_clips(
     movie_path: str,
     clip_length: int,
     upl_second_i: int,
@@ -1606,7 +1478,7 @@ def create_clips(
             clips_start_df.iterrows(), total=clips_start_df.shape[0]
         ):
             # Extract the videos and store them in the folder
-            extract_clips(
+            _extract_clips(
                 movie_path=movies_paths,
                 clip_length=clip_length,
                 upl_second_i=row["upl_seconds"],
@@ -1619,7 +1491,7 @@ def create_clips(
     logging.info("Extracting clips")
     # Read each movie and extract the clips from the original videos
     for index, row in tqdm(clips_start_df.iterrows(), total=clips_start_df.shape[0]):
-        extract_clips(
+        _extract_clips(
             movie_path=movies_paths,
             clip_length=clip_length,
             upl_second_i=row["upl_seconds"],
@@ -1965,7 +1837,7 @@ def extract_frames_for_zoo(
     comb_df.drop(["subject_ids"], inplace=True, axis=1)
 
     # Check the frames haven't been uploaded to Zooniverse
-    comb_df = check_frames_uploaded(db_connection, comb_df)
+    comb_df = _check_frames_uploaded(db_connection, comb_df)
 
     # Specify the temp location to store the frames
     temp_frames_folder = "_".join(species_list) + "_frames/"
@@ -2032,7 +1904,7 @@ def check_frame_size(frame_paths: list):
 
 
 # Function to gather information of frames already uploaded to Zooniverse
-def check_frames_uploaded(
+def _check_frames_uploaded(
     db_connection,
     frames_df: pd.DataFrame,
 ):
