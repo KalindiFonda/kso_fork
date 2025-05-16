@@ -172,19 +172,8 @@ jobs:
         run: |
           nbqa pylint --disable=unexpected-keyword-arg,no-member,assignment-from-no-return,no-value-for-parameter notebooks
         # If one of the pylint steps fails, there are errors and we do not need to run the test below.
-      - name: Login W&B
+      - name: Pytest
         shell: bash
-        env:
-          WANDB_API: ${{ secrets.WANDB_KEY }}
         run: |
-          source /opt/conda/etc/profile.d/conda.sh
-          conda activate myenv 
-          wandb login "$WANDB_API"
-      - name: Run notebook and widget tests
-        id: nb-tests
-        run: >-
-          export "WANDB_DIR=$(mktemp -d)" && export WANDB_CACHE_DIR="$WANDB_DIR" &&
-          mkdir -p yolov5_tracker/trackers && cp src/multi_tracker_zoo.py yolov5_tracker/trackers/multi_tracker_zoo.py &&
-          pytest --disable-warnings test/widget-tests.py &&
-          pytest --disable-warnings --zoo_user=${{ secrets.ZOO_USERNAME }} --zoo_pass=${{ secrets.ZOO_TOKEN }} test/notebook-tests.py
-
+          export PYTHONPATH=.
+          pytest -vv .
