@@ -34,6 +34,11 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 
+# Custom error
+class AuthenticationError(Exception):
+    pass
+
+
 ##########################
 # General Zoo purpose functions
 ##########################

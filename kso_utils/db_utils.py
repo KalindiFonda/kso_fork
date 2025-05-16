@@ -249,7 +249,9 @@ def create_db(db_path_str: str) -> sqlite3.Connection:
         c = conn.cursor()
         c.executescript(sql_setup)
     except sqlite3.Error as e:
-        raise sqlite3.Error(f"Failed to init DB schema: {e}. SQL statements: {sql}")
+        raise sqlite3.Error(
+            f"Failed to init DB schema: {e}. SQL statements: {sql_setup}"
+        )
     logging.info("Database creation success")
     return conn
 

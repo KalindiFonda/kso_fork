@@ -1,4 +1,4 @@
-name: Linting test
+name: Code formatting
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
       - dev
 
 jobs:
-  lint:
+  black:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -20,4 +20,3 @@ jobs:
           options: "--check --verbose"
           jupyter: true
           version: "~= 24.0"
-
