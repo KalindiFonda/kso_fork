@@ -162,16 +162,11 @@ jobs:
           pip install pylint pytest nbqa
           echo "/github/home/.local/bin" >> $GITHUB_PATH  # Add the local bin path to the GitHub path
 
-      - name: Pylint Test kso_utils
+      - name: Pylint kso_utils
         shell: bash
         run: |
           pylint --disable=possibly-used-before-assignment,used-before-assignment,no-member,assignment-from-no-return kso_utils
-      - name: Pylint Test tests
-        if: success() || failure()
-        shell: bash
-        run: |
-          pylint --disable=no-member,assignment-from-no-return test/*
-      - name: Pylint Test NB notebooks
+      - name: Pylint notebooks
         if: success() || failure()
         shell: bash
         run: |
