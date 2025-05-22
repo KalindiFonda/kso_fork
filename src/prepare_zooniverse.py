@@ -10,13 +10,13 @@ import numpy as np
 import logging
 import datetime
 import PIL
+import sqlite3
 from pathlib import Path
 from functools import partial
 from tqdm import tqdm
 from PIL import Image
 
 # utils imports
-from kso_utils.db_utils import create_connection
 from kso_utils.koster_utils import fix_text_encoding
 from kso_utils.server_utils import retrieve_movie_info_from_server, get_movie_url
 from kso_utils.t4_utils import get_species_ids
@@ -119,6 +119,7 @@ def split_frames(data_path: str, perc_test: float):
 
 def frame_aggregation(
     project: project_utils.Project,
+    conn: sqlite3.Connection,
     db_info_dict: dict,
     out_path: str,
     perc_test: float,
@@ -129,8 +130,6 @@ def frame_aggregation(
     track_frames: bool = True,
     n_tracked_frames: int = 10,
 ):
-    conn = create_connection(db_info_dict["db_path"])
-
     species_ref = get_species_ids(project, class_list)
 
     species_sql_query = (
