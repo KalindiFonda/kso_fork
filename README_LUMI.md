@@ -11,14 +11,14 @@
   - Memory (GB): 30 (Note: this is CPU memory; use values below 64 GB if using only a single GPU; see [billing](https://docs.lumi-supercomputer.eu/runjobs/lumi_env/billing/#gpu-billing))
   - Number of GPUs (MI250 GCDs): 1
   - Time: 2:00:00 (Note: adjust as needed)
-  - Working directory: /scratch/project_465001460
+  - Working directory: /scratch/$PROJECT
   - Under 'Advanced'
-    - Custom init: Text
-    - Script to start: Copy-paste the following lines (you can omit the first line if you have notebooks already available on LUMI):
+    - Custom Python type: Script
+    - Script or path to script: Copy-paste the following lines (you can omit the first line if you have notebooks already available on LUMI):
 
-          git clone -b add-lumi https://github.com/ocean-data-factory-sweden/kso.git "/scratch/project_465001460/$USER/kso";
+          git clone -b add-lumi https://github.com/ocean-data-factory-sweden/kso.git "/scratch/$PROJECT/$USER/kso"
           export SINGULARITY_BIND="/pfs,/scratch,/projappl,/project,/flash,/appl"
-          export python="singularity exec /projappl/project_465001460/containers/kso-lumi_0.1.0.sif python3"
+          export python="singularity exec /projappl/$PROJECT/containers/kso-lumi_0.1.0.sif python3"
 
 - Click Launch
 - Wait for the Jupyter session to be queued and launched
