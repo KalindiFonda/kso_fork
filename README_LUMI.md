@@ -19,6 +19,7 @@
           git clone -b add-lumi https://github.com/ocean-data-factory-sweden/kso.git "/scratch/$PROJECT/$USER/kso"
           export SINGULARITY_BIND="/pfs,/scratch,/projappl,/project,/flash,/appl"
           export python="singularity exec /projappl/$PROJECT/containers/kso-lumi_0.1.0.sif python3"
+          export PYTHONUSERBASE="/scratch/$PROJECT/$USER/venv"
 
 - Click Launch
 - Wait for the Jupyter session to be queued and launched
