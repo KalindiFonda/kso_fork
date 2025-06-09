@@ -110,6 +110,11 @@ The current portals are accessible as:
 2. Album (JupyterHub) - [notebooks][cdn_album]
 3. Vendor (MLFlow) - [mlflow][cdn_vendor]
 
+### Image Analysis Workflow
+
+The KSO system can also be adapted for image-based analysis workflows, such as processing large sets of still images for classification or object detection. For detailed instructions on how to set up your project, prepare your image data, and utilize the relevant KSO notebooks for image analysis, please refer to our dedicated guide:
+
+*   **[Using KSO for Image Analysis](IMAGE_ANALYSIS.md)**
 
 ## Starting a new project
 To start a new project you will need to:
